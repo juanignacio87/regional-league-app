@@ -4,18 +4,25 @@
         <span>@Match.StartsAt.LocalDateTime.ToString("dd/MM HH:mm")</span>
     </div>
     <div class="score-line">
-        <strong>@Match.HomeTeam?.Club?.ShortName</strong>
+        <span class="team-name">@HomeName</span>
         <b>@ScoreText</b>
-        <strong>@Match.AwayTeam?.Club?.ShortName</strong>
+        <span class="team-name text-end">@AwayName</span>
     </div>
-    <small class="status-pill">@Match.Status</small>
+    <small class="status-pill @StatusClass">@Match.Status</small>
 </a>
 
 @code {
     [Parameter, EditorRequired] public Match Match { get; set; } = default!;
 
+    private string HomeName => Match.HomeTeam?.Club?.ShortName ?? Match.HomeTeam?.Name ?? "Local";
+    private string AwayName => Match.AwayTeam?.Club?.ShortName ?? Match.AwayTeam?.Name ?? "Visitante";
+
     private string ScoreText =>
         Match.HomeScore is null || Match.AwayScore is null
             ? "vs"
             : $"{Match.HomeScore}-{Match.AwayScore}";
+
+    private string StatusClass => Match.Status is MatchStatus.Live or MatchStatus.HalfTime
+        ? "status-live"
+        : string.Empty;
 }

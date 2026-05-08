@@ -1,80 +1,47 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">RegionalLeagueApp</a>
-    </div>
-</div>
+<header class="app-header">
+    <div class="header-inner">
+        <a class="brand" href="">
+            <span class="brand-mark">RL</span>
+            <span>
+                <strong>Regional League</strong>
+                <small>Resultados y fixture</small>
+            </span>
+        </a>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+        <input id="nav-toggle" type="checkbox" title="Navigation menu" class="navbar-toggler" />
+        <label for="nav-toggle" class="navbar-toggle-label" aria-label="Abrir menu">
+            <span></span>
+            <span></span>
+            <span></span>
+        </label>
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Inicio
-            </NavLink>
-        </div>
+        <nav class="nav-scrollable" onclick="document.getElementById('nav-toggle')?.click()">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">Inicio</NavLink>
+            <NavLink class="nav-link" href="fixture">Fixture</NavLink>
+            <NavLink class="nav-link" href="results">Resultados</NavLink>
+            <NavLink class="nav-link" href="standings">Tabla</NavLink>
+            <NavLink class="nav-link" href="clubs">Clubes</NavLink>
+            <NavLink class="nav-link" href="scorers">Goleadores</NavLink>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="fixture">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Fixture
-            </NavLink>
-        </div>
+            <AuthorizeView Roles="@AppRoles.Admin">
+                <Authorized>
+                    <NavLink class="nav-link nav-link-admin" href="admin">Admin</NavLink>
+                </Authorized>
+            </AuthorizeView>
+        </nav>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="results">
-                <span class="bi bi-check-square-fill-nav-menu" aria-hidden="true"></span> Resultados
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="standings">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Tabla
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="clubs">
-                <span class="bi bi-person-badge-nav-menu" aria-hidden="true"></span> Clubes
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="scorers">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Goleadores
-            </NavLink>
-        </div>
-
-        <AuthorizeView Roles="@AppRoles.Admin">
-            <Authorized>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="admin">
-                        <span class="bi bi-lock-nav-menu" aria-hidden="true"></span> Admin
-                    </NavLink>
-                </div>
-            </Authorized>
-        </AuthorizeView>
-
-        <AuthorizeView>
-            <Authorized Context="auth">
-                <div class="nav-item px-3">
-                    <span class="nav-link">@auth.User.Identity?.Name</span>
-                </div>
-                <div class="nav-item px-3">
+        <div class="account-nav">
+            <AuthorizeView>
+                <Authorized Context="auth">
+                    <span class="account-name">@auth.User.Identity?.Name</span>
                     <form method="post" action="/account/logout">
-                        <button type="submit" class="nav-link">
-                            <span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span> Salir
-                        </button>
+                        <button type="submit" class="account-button">Salir</button>
                     </form>
-                </div>
-            </Authorized>
-            <NotAuthorized>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="login">
-                        <span class="bi bi-person-badge-nav-menu" aria-hidden="true"></span> Ingresar
-                    </NavLink>
-                </div>
-            </NotAuthorized>
-        </AuthorizeView>
-    </nav>
-</div>
-
+                </Authorized>
+                <NotAuthorized>
+                    <NavLink class="account-button" href="login">Ingresar</NavLink>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+    </div>
+</header>
