@@ -3,9 +3,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using RegionalLeagueApp.Application.Abstractions.Data;
+using RegionalLeagueApp.Application.Standings;
 using RegionalLeagueApp.Infrastructure.Identity;
 using RegionalLeagueApp.Infrastructure.Persistence;
 using RegionalLeagueApp.Infrastructure.Seed;
+using RegionalLeagueApp.Infrastructure.Standings;
 
 namespace RegionalLeagueApp.Infrastructure;
 
@@ -38,6 +40,7 @@ public static class DependencyInjection
 
         services.AddScoped<IApplicationDbContext>(provider =>
             provider.GetRequiredService<ApplicationDbContext>());
+        services.AddScoped<IStandingsQueryService, EfStandingsQueryService>();
         services.Configure<DevelopmentSeedOptions>(options =>
         {
             var section = configuration.GetSection("Seed");

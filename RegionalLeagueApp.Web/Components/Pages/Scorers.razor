@@ -43,25 +43,26 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        scorers = await Db.MatchEvents
+        var goalEvents = await Db.MatchEvents
             .AsNoTracking()
-            .Include(x => x.Player)!.ThenInclude(x => x!.Team)!.ThenInclude(x => x!.Club)
             .Where(x => x.PlayerId != null &&
                 (x.Type == MatchEventType.Goal || x.Type == MatchEventType.PenaltyScored))
-            .GroupBy(x => new
+            .Select(x => new
             {
-                x.PlayerId,
-                x.Player!.FirstName,
-                x.Player.LastName,
-                ClubName = x.Player.Team!.Club!.Name
+                PlayerName = x.Player!.FirstName + " " + x.Player.LastName,
+                TeamName = x.Player.Team!.Club!.Name
             })
+            .ToListAsync();
+
+        scorers = goalEvents
+            .GroupBy(x => new { x.PlayerName, x.TeamName })
             .Select(group => new ScorerRow(
-                $"{group.Key.FirstName} {group.Key.LastName}",
-                group.Key.ClubName,
+                group.Key.PlayerName,
+                group.Key.TeamName,
                 group.Count()))
             .OrderByDescending(x => x.Goals)
             .ThenBy(x => x.PlayerName)
-            .ToListAsync();
+            .ToList();
     }
 
     private sealed record ScorerRow(string PlayerName, string TeamName, int Goals);

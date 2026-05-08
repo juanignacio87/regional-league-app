@@ -1,6 +1,6 @@
 @page "/standings"
-@using Microsoft.EntityFrameworkCore
-@inject ApplicationDbContext Db
+@using RegionalLeagueApp.Application.Standings
+@inject IStandingsQueryService StandingsQueryService
 
 <PageTitle>Tabla</PageTitle>
 
@@ -15,27 +15,28 @@
 }
 else
 {
-    <section class="panel table-panel">
+    <section class="panel table-panel standings-table">
         <table>
             <thead>
                 <tr>
-                    <th>Equipo</th>
-                    <th>Pts</th>
+                    <th>Pos</th>
+                    <th>Club</th>
                     <th>PJ</th>
-                    <th>G</th>
-                    <th>E</th>
-                    <th>P</th>
+                    <th>PG</th>
+                    <th>PE</th>
+                    <th>PP</th>
                     <th>GF</th>
                     <th>GC</th>
                     <th>DG</th>
+                    <th>PTS</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var row in standings)
                 {
-                    <tr>
-                        <td><a href="clubs/@row.Team?.ClubId">@row.Team?.Club?.Name</a></td>
-                        <td><strong>@row.Points</strong></td>
+                    <tr class="@(row.Position == 1 ? "leader-row" : string.Empty)">
+                        <td><strong>@row.Position</strong></td>
+                        <td><a href="clubs/@row.ClubId">@row.ClubName</a></td>
                         <td>@row.Played</td>
                         <td>@row.Won</td>
                         <td>@row.Drawn</td>
@@ -43,6 +44,7 @@ else
                         <td>@row.GoalsFor</td>
                         <td>@row.GoalsAgainst</td>
                         <td>@row.GoalDifference</td>
+                        <td><strong>@row.Points</strong></td>
                     </tr>
                 }
             </tbody>
@@ -51,17 +53,10 @@ else
 }
 
 @code {
-    private List<Standing> standings = [];
+    private IReadOnlyList<StandingRowDto> standings = [];
 
     protected override async Task OnInitializedAsync()
     {
-        standings = await Db.Standings
-            .AsNoTracking()
-            .Include(x => x.Team)!.ThenInclude(x => x!.Club)
-            .Include(x => x.Competition)
-            .OrderByDescending(x => x.Points)
-            .ThenByDescending(x => x.GoalDifference)
-            .ThenByDescending(x => x.GoalsFor)
-            .ToListAsync();
+        standings = await StandingsQueryService.GetStandingsAsync();
     }
 }
