@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="..\buildMultiTargeting\RegionalLeagueApp.Web.props" />
-</Project>

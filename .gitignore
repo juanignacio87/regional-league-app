@@ -1,0 +1,12 @@
+.vs/
+bin/
+obj/
+*.user
+*.suo
+*.rsuser
+*.db
+*.sqlite
+DockerDesktop.vhdx
+.env
+appsettings.Local.json
+appsettings.Production.json
