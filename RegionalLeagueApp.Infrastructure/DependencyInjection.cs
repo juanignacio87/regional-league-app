@@ -41,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<IApplicationDbContext>(provider =>
             provider.GetRequiredService<ApplicationDbContext>());
         services.AddScoped<IStandingsQueryService, EfStandingsQueryService>();
+        services.AddScoped<IStandingsRecalculationService, EfStandingsRecalculationService>();
         services.Configure<DevelopmentSeedOptions>(options =>
         {
             var section = configuration.GetSection("Seed");

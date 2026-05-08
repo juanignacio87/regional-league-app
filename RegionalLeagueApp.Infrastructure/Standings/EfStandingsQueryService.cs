@@ -16,6 +16,7 @@ public sealed class EfStandingsQueryService(ApplicationDbContext dbContext) : IS
                 team.Id,
                 team.CompetitionId,
                 CompetitionName = team.Competition!.Name,
+                TeamId = team.Id,
                 team.ClubId,
                 ClubName = team.Club!.Name
             })
@@ -89,6 +90,7 @@ public sealed class EfStandingsQueryService(ApplicationDbContext dbContext) : IS
                 return new StandingRowDraft(
                     team.CompetitionId,
                     team.CompetitionName,
+                    team.TeamId,
                     team.ClubId,
                     team.ClubName,
                     stat?.Played ?? 0,
@@ -108,6 +110,7 @@ public sealed class EfStandingsQueryService(ApplicationDbContext dbContext) : IS
                 index + 1,
                 row.CompetitionId,
                 row.CompetitionName,
+                row.TeamId,
                 row.ClubId,
                 row.ClubName,
                 row.Played,
@@ -124,6 +127,7 @@ public sealed class EfStandingsQueryService(ApplicationDbContext dbContext) : IS
     private sealed record StandingRowDraft(
         Guid CompetitionId,
         string CompetitionName,
+        Guid TeamId,
         Guid ClubId,
         string ClubName,
         int Played,

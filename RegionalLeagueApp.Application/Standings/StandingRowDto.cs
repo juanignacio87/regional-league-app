@@ -4,6 +4,7 @@ public sealed record StandingRowDto(
     int Position,
     Guid CompetitionId,
     string CompetitionName,
+    Guid TeamId,
     Guid ClubId,
     string ClubName,
     int Played,
