@@ -153,6 +153,26 @@ h1:focus {
     text-decoration: none;
 }
 
+.panel-title-row {
+    align-items: center;
+    display: flex;
+    gap: .75rem;
+    justify-content: space-between;
+    margin-bottom: .85rem;
+}
+
+.panel-title-row h2,
+.panel-title-row p {
+    margin-bottom: 0;
+}
+
+.panel-title-row span,
+.panel-title-row a,
+.muted-text {
+    color: #60716d;
+    font-size: .9rem;
+}
+
 .muted {
     color: #60716d;
 }
@@ -245,6 +265,17 @@ th {
     color: #60716d;
     font-size: .85rem;
     font-weight: 800;
+}
+
+tr.is-selected {
+    background: #edf8f5;
+}
+
+.table-kicker {
+    color: #60716d;
+    display: block;
+    font-size: .78rem;
+    font-weight: 700;
 }
 
 .club-grid {
@@ -343,6 +374,69 @@ th {
     gap: .75rem;
 }
 
+.admin-heading {
+    align-items: center;
+}
+
+.admin-badge {
+    background: #e6f3ef;
+    border-radius: 999px;
+    color: #0f4f43;
+    font-size: .85rem;
+    font-weight: 800;
+    padding: .45rem .7rem;
+}
+
+.admin-grid {
+    align-items: start;
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: minmax(0, 1.45fr) minmax(320px, .75fr);
+}
+
+.admin-match-list table {
+    min-width: 760px;
+}
+
+.table-actions {
+    text-align: right;
+}
+
+.admin-link-button {
+    background: #e6f3ef;
+    border: 0;
+    border-radius: 999px;
+    color: #0f4f43;
+    font-weight: 800;
+    padding: .35rem .65rem;
+}
+
+.admin-editor {
+    position: sticky;
+    top: 92px;
+}
+
+.detail-list.compact {
+    margin-bottom: 1rem;
+}
+
+.admin-form {
+    display: grid;
+    gap: .75rem;
+}
+
+.admin-form label {
+    color: #40514d;
+    font-size: .9rem;
+    font-weight: 800;
+}
+
+.score-edit-grid {
+    display: grid;
+    gap: .75rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .checkbox-line {
     align-items: center;
     display: flex;
@@ -378,7 +472,8 @@ th {
 @media (max-width: 900px) {
     .content-grid,
     .content-grid.two-col,
-    .match-hero {
+    .match-hero,
+    .admin-grid {
         grid-template-columns: 1fr;
     }
 
@@ -391,6 +486,10 @@ th {
         align-items: stretch;
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    }
+
+    .admin-editor {
+        position: static;
     }
 }
 
@@ -410,5 +509,14 @@ th {
     th,
     td {
         padding: .55rem;
+    }
+
+    .admin-badge {
+        display: inline-block;
+        margin-top: .65rem;
+    }
+
+    .score-edit-grid {
+        grid-template-columns: 1fr;
     }
 }

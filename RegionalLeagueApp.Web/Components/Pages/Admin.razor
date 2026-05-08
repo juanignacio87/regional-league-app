@@ -1,7 +1,286 @@
 @page "/admin"
-@attribute [Authorize(Roles = AppRoles.Admin)]
+@rendermode InteractiveServer
+@attribute [Authorize(Policy = "RequireModerator")]
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
 
 <PageTitle>Admin</PageTitle>
 
-<h1>Administracion</h1>
-<p>Seccion protegida para usuarios con rol Admin.</p>
+<div class="page-heading admin-heading">
+    <div>
+        <p class="eyebrow">Administracion</p>
+        <h1>Gestion de partidos</h1>
+    </div>
+    <span class="admin-badge">Admin / Moderator</span>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(successMessage))
+{
+    <div class="alert alert-success">@successMessage</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@if (matches.Count == 0)
+{
+    <EmptyState Text="No hay partidos para administrar." />
+}
+else
+{
+    <section class="admin-grid">
+        <article class="panel table-panel admin-match-list">
+            <div class="panel-title-row">
+                <div>
+                    <p class="eyebrow">Partidos</p>
+                    <h2>Fixture cargado</h2>
+                </div>
+                <span>@matches.Count partidos</span>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Partido</th>
+                        <th>Estado</th>
+                        <th>Resultado</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var match in matches)
+                    {
+                        <tr class="@(editing?.MatchId == match.Id ? "is-selected" : string.Empty)">
+                            <td>
+                                <span class="table-kicker">@match.RoundName</span>
+                                @match.StartsAt.LocalDateTime.ToString("dd/MM HH:mm")
+                            </td>
+                            <td>
+                                <strong>@match.HomeTeamName</strong>
+                                <span class="muted-text">vs</span>
+                                <strong>@match.AwayTeamName</strong>
+                            </td>
+                            <td><span class="status-pill @StatusClass(match.Status)">@match.Status</span></td>
+                            <td><strong>@ScoreText(match.HomeScore, match.AwayScore)</strong></td>
+                            <td class="table-actions">
+                                <button type="button" class="admin-link-button" @onclick="() => SelectMatch(match.Id)">Editar</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </article>
+
+        <aside class="panel admin-editor">
+            @if (editing is null)
+            {
+                <EmptyState Text="Selecciona un partido para editar su estado y resultado." />
+            }
+            else
+            {
+                <div class="panel-title-row">
+                    <div>
+                        <p class="eyebrow">Edicion</p>
+                        <h2>@editing.HomeTeamName vs @editing.AwayTeamName</h2>
+                    </div>
+                    <a href="matches/@editing.MatchId">Ver</a>
+                </div>
+
+                <dl class="detail-list compact">
+                    <div><dt>Competencia</dt><dd>@editing.CompetitionName</dd></div>
+                    <div><dt>Fecha</dt><dd>@editing.StartsAt.LocalDateTime.ToString("dd/MM/yyyy HH:mm")</dd></div>
+                    <div><dt>Local</dt><dd>@editing.HomeTeamName</dd></div>
+                    <div><dt>Visitante</dt><dd>@editing.AwayTeamName</dd></div>
+                </dl>
+
+                <EditForm Model="editing" OnValidSubmit="SaveAsync" class="admin-form">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <label for="status">Estado</label>
+                    <InputSelect id="status" class="form-control" @bind-Value="editing.Status">
+                        @foreach (var status in Enum.GetValues<MatchStatus>())
+                        {
+                            <option value="@status">@status</option>
+                        }
+                    </InputSelect>
+
+                    <div class="score-edit-grid">
+                        <div>
+                            <label for="home-score">Goles local</label>
+                            <InputNumber id="home-score" class="form-control" min="0" @bind-Value="editing.HomeScore" />
+                        </div>
+                        <div>
+                            <label for="away-score">Goles visitante</label>
+                            <InputNumber id="away-score" class="form-control" min="0" @bind-Value="editing.AwayScore" />
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary" type="submit" disabled="@isSaving">
+                        @(isSaving ? "Guardando..." : "Guardar cambios")
+                    </button>
+                </EditForm>
+            }
+        </aside>
+    </section>
+}
+
+@code {
+    private readonly List<AdminMatchRow> matches = [];
+    private MatchEditModel? editing;
+    private bool isSaving;
+    private string? successMessage;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadMatchesAsync();
+    }
+
+    private async Task LoadMatchesAsync()
+    {
+        matches.Clear();
+        matches.AddRange(await Db.Matches
+            .AsNoTracking()
+            .Include(x => x.Competition)
+            .Include(x => x.Round)
+            .Include(x => x.HomeTeam)!.ThenInclude(x => x!.Club)
+            .Include(x => x.AwayTeam)!.ThenInclude(x => x!.Club)
+            .OrderByDescending(x => x.StartsAt)
+            .Select(x => new AdminMatchRow(
+                x.Id,
+                x.Competition!.Name,
+                x.Round!.Name,
+                x.HomeTeam!.Club!.Name,
+                x.AwayTeam!.Club!.Name,
+                x.StartsAt,
+                x.Status,
+                x.HomeScore,
+                x.AwayScore))
+            .ToListAsync());
+    }
+
+    private void SelectMatch(Guid matchId)
+    {
+        successMessage = null;
+        errorMessage = null;
+
+        var match = matches.FirstOrDefault(x => x.Id == matchId);
+        if (match is null)
+        {
+            editing = null;
+            return;
+        }
+
+        editing = new MatchEditModel
+        {
+            MatchId = match.Id,
+            CompetitionName = match.CompetitionName,
+            RoundName = match.RoundName,
+            HomeTeamName = match.HomeTeamName,
+            AwayTeamName = match.AwayTeamName,
+            StartsAt = match.StartsAt,
+            Status = match.Status,
+            HomeScore = match.HomeScore,
+            AwayScore = match.AwayScore
+        };
+    }
+
+    private async Task SaveAsync()
+    {
+        if (editing is null || isSaving)
+        {
+            return;
+        }
+
+        successMessage = null;
+        errorMessage = Validate(editing);
+        if (errorMessage is not null)
+        {
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            var match = await Db.Matches.FirstOrDefaultAsync(x => x.Id == editing.MatchId);
+            if (match is null)
+            {
+                errorMessage = "No se encontro el partido seleccionado.";
+                return;
+            }
+
+            Db.Entry(match).Property(x => x.Status).CurrentValue = editing.Status;
+            Db.Entry(match).Property(x => x.HomeScore).CurrentValue = editing.HomeScore;
+            Db.Entry(match).Property(x => x.AwayScore).CurrentValue = editing.AwayScore;
+
+            await Db.SaveChangesAsync();
+            await LoadMatchesAsync();
+            SelectMatch(editing.MatchId);
+
+            successMessage = "Resultado actualizado correctamente.";
+        }
+        catch (Exception)
+        {
+            errorMessage = "No se pudo guardar el resultado. Revisa los datos e intenta nuevamente.";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private static string? Validate(MatchEditModel model)
+    {
+        if (model.HomeScore < 0 || model.AwayScore < 0)
+        {
+            return "Los goles no pueden ser negativos.";
+        }
+
+        if (model.Status == MatchStatus.Finished && (model.HomeScore is null || model.AwayScore is null))
+        {
+            return "Un partido finalizado debe tener goles local y visitante cargados.";
+        }
+
+        return null;
+    }
+
+    private static string ScoreText(int? homeScore, int? awayScore) =>
+        homeScore is null || awayScore is null ? "vs" : $"{homeScore}-{awayScore}";
+
+    private static string StatusClass(MatchStatus status) => status is MatchStatus.Live or MatchStatus.HalfTime
+        ? "status-live"
+        : string.Empty;
+
+    private sealed record AdminMatchRow(
+        Guid Id,
+        string CompetitionName,
+        string RoundName,
+        string HomeTeamName,
+        string AwayTeamName,
+        DateTimeOffset StartsAt,
+        MatchStatus Status,
+        int? HomeScore,
+        int? AwayScore);
+
+    private sealed class MatchEditModel
+    {
+        public Guid MatchId { get; set; }
+        public string CompetitionName { get; set; } = string.Empty;
+        public string RoundName { get; set; } = string.Empty;
+        public string HomeTeamName { get; set; } = string.Empty;
+        public string AwayTeamName { get; set; } = string.Empty;
+        public DateTimeOffset StartsAt { get; set; }
+        public MatchStatus Status { get; set; }
+
+        [Range(0, int.MaxValue, ErrorMessage = "Los goles local no pueden ser negativos.")]
+        public int? HomeScore { get; set; }
+
+        [Range(0, int.MaxValue, ErrorMessage = "Los goles visitante no pueden ser negativos.")]
+        public int? AwayScore { get; set; }
+    }
+}
