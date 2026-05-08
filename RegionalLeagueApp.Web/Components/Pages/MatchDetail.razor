@@ -47,7 +47,7 @@ else
                         <div class="timeline-item">
                             <strong>@item.Minute'</strong>
                             <span>@EventLabel(item)</span>
-                            <small>@item.Team?.Club?.ShortName @item.Player?.FullName @item.Notes</small>
+                            <small>@item.Team?.Club?.ShortName @PlayerText(item) @item.Notes</small>
                         </div>
                     }
                 </div>
@@ -92,4 +92,9 @@ else
         MatchEventType.Substitution => "Cambio",
         _ => item.Type.ToString()
     };
+
+    private static string PlayerText(MatchEvent item) =>
+        !string.IsNullOrWhiteSpace(item.PlayerName)
+            ? item.PlayerName
+            : item.Player?.FullName ?? string.Empty;
 }

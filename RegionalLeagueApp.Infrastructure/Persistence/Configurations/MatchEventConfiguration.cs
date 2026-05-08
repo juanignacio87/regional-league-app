@@ -9,9 +9,13 @@ public sealed class MatchEventConfiguration : IEntityTypeConfiguration<MatchEven
     public void Configure(EntityTypeBuilder<MatchEvent> builder)
     {
         builder.ToTable("match_events", table =>
-            table.HasCheckConstraint("ck_match_events_minute_non_negative", "\"Minute\" >= 0"));
+        {
+            table.HasCheckConstraint("ck_match_events_minute_non_negative", "\"Minute\" >= 0");
+            table.HasCheckConstraint("ck_match_events_minute_range", "\"Minute\" >= 0 AND \"Minute\" <= 130");
+        });
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Type).HasConversion<string>().HasMaxLength(40).IsRequired();
+        builder.Property(x => x.PlayerName).HasMaxLength(150).IsRequired();
         builder.Property(x => x.Notes).HasMaxLength(500);
         builder.HasIndex(x => new { x.MatchId, x.Minute });
 
