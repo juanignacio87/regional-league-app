@@ -1,45 +1,45 @@
-<header class="app-header">
-    <div class="header-inner">
-        <a class="brand" href="">
-            <span class="brand-mark">RL</span>
-            <span>
+<header class="rl-navbar">
+    <div class="rl-navbar__inner">
+        <a class="rl-navbar__brand" href="">
+            <span class="rl-navbar__brand-mark">RL</span>
+            <span class="rl-navbar__brand-text">
                 <strong>Regional League</strong>
                 <small>Resultados y fixture</small>
             </span>
         </a>
 
-        <input id="nav-toggle" type="checkbox" title="Navigation menu" class="navbar-toggler" />
-        <label for="nav-toggle" class="navbar-toggle-label" aria-label="Abrir menu">
+        <input id="rl-navbar-toggle" type="checkbox" title="Navigation menu" class="rl-navbar__toggle-input" aria-hidden="true" tabindex="-1" />
+        <label for="rl-navbar-toggle" class="rl-navbar__toggle-button" aria-label="Abrir menu">
             <span></span>
             <span></span>
             <span></span>
         </label>
 
-        <nav class="nav-scrollable" onclick="document.getElementById('nav-toggle')?.click()">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">Inicio</NavLink>
-            <NavLink class="nav-link" href="fixture">Fixture</NavLink>
-            <NavLink class="nav-link" href="results">Resultados</NavLink>
-            <NavLink class="nav-link" href="standings">Tabla</NavLink>
-            <NavLink class="nav-link" href="clubs">Clubes</NavLink>
-            <NavLink class="nav-link" href="scorers">Goleadores</NavLink>
+        <nav class="rl-navbar__links" onclick="document.getElementById('rl-navbar-toggle')?.click()">
+            <NavLink class="rl-navbar__link" href="" Match="NavLinkMatch.All">Inicio</NavLink>
+            <NavLink class="rl-navbar__link" href="fixture">Fixture</NavLink>
+            <NavLink class="rl-navbar__link" href="results">Resultados</NavLink>
+            <NavLink class="rl-navbar__link" href="standings">Tabla</NavLink>
+            <NavLink class="rl-navbar__link" href="clubs">Clubes</NavLink>
+            <NavLink class="rl-navbar__link" href="scorers">Goleadores</NavLink>
 
             <AuthorizeView Roles="@AppRoles.Admin">
                 <Authorized>
-                    <NavLink class="nav-link nav-link-admin" href="admin">Admin</NavLink>
+                    <NavLink class="rl-navbar__link rl-navbar__link--admin" href="admin">Admin</NavLink>
                 </Authorized>
             </AuthorizeView>
         </nav>
 
-        <div class="account-nav">
+        <div class="rl-navbar__account">
             <AuthorizeView>
                 <Authorized Context="auth">
-                    <span class="account-name">@auth.User.Identity?.Name</span>
+                    <span class="rl-navbar__account-name">@auth.User.Identity?.Name</span>
                     <form method="post" action="/account/logout">
-                        <button type="submit" class="account-button">Salir</button>
+                        <button type="submit" class="rl-navbar__account-button">Salir</button>
                     </form>
                 </Authorized>
                 <NotAuthorized>
-                    <NavLink class="account-button" href="login">Ingresar</NavLink>
+                    <NavLink class="rl-navbar__account-button" href="login">Ingresar</NavLink>
                 </NotAuthorized>
             </AuthorizeView>
         </div>

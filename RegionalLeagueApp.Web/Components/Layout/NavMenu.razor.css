@@ -1,32 +1,41 @@
-.app-header {
-    background: rgba(255, 255, 255, .96);
+.rl-navbar {
+    background: rgba(255, 255, 255, .97);
     border-bottom: 1px solid #dfe8e5;
     position: sticky;
     top: 0;
     z-index: 20;
 }
 
-.header-inner {
+.rl-navbar__inner {
     align-items: center;
     display: grid;
     gap: 1rem;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     margin: 0 auto;
     max-width: 1180px;
     min-height: 72px;
     padding: 0 1.25rem;
 }
 
-.brand {
+.rl-navbar__brand,
+.rl-navbar__links,
+.rl-navbar__account {
     align-items: center;
+    display: flex;
+}
+
+.rl-navbar__brand {
     color: #10231f;
-    display: inline-flex;
     gap: .75rem;
     min-width: 210px;
     text-decoration: none;
 }
 
-.brand-mark {
+.rl-navbar__brand:hover {
+    color: #10231f;
+}
+
+.rl-navbar__brand-mark {
     align-items: center;
     background: #103d35;
     border-radius: 8px;
@@ -38,52 +47,63 @@
     width: 42px;
 }
 
-.brand strong,
-.brand small {
+.rl-navbar__brand-text strong,
+.rl-navbar__brand-text small {
     display: block;
     line-height: 1.1;
 }
 
-.brand small {
+.rl-navbar__brand-text small {
     color: #60716d;
     font-size: .78rem;
     margin-top: .2rem;
 }
 
-.nav-scrollable {
-    align-items: center;
-    display: flex;
+.rl-navbar__links {
     gap: .25rem;
     justify-content: center;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
 }
 
-.nav-scrollable ::deep .nav-link {
+.rl-navbar__links::-webkit-scrollbar {
+    display: none;
+}
+
+.rl-navbar__links ::deep .rl-navbar__link {
     border-radius: 999px;
     color: #334541;
+    flex: 0 0 auto;
     font-size: .92rem;
-    font-weight: 600;
+    font-weight: 700;
+    line-height: 1.2;
     padding: .55rem .85rem;
     text-decoration: none;
+    white-space: nowrap;
 }
 
-.nav-scrollable ::deep .nav-link:hover,
-.nav-scrollable ::deep .nav-link.active {
+.rl-navbar__links ::deep .rl-navbar__link:hover,
+.rl-navbar__links ::deep .rl-navbar__link.active {
     background: #e6f3ef;
     color: #0f4f43;
 }
 
-.nav-scrollable ::deep .nav-link-admin {
+.rl-navbar__links ::deep .rl-navbar__link--admin {
     color: #7c2d12;
 }
 
-.account-nav {
-    align-items: center;
-    display: flex;
+.rl-navbar__account {
     gap: .6rem;
     justify-content: end;
+    min-width: 0;
 }
 
-.account-name {
+.rl-navbar__account form {
+    margin: 0;
+}
+
+.rl-navbar__account-name {
     color: #60716d;
     font-size: .85rem;
     max-width: 150px;
@@ -92,59 +112,69 @@
     white-space: nowrap;
 }
 
-.account-button {
+.rl-navbar__account-button {
     background: #103d35;
     border: 0;
     border-radius: 999px;
     color: #fff;
     display: inline-block;
     font-size: .9rem;
-    font-weight: 700;
-    padding: .5rem .8rem;
+    font-weight: 800;
+    line-height: 1.2;
+    padding: .55rem .85rem;
     text-decoration: none;
+    white-space: nowrap;
 }
 
-.navbar-toggler,
-.navbar-toggle-label {
+.rl-navbar__account-button:hover {
+    background: #0f4f43;
+    color: #fff;
+}
+
+.rl-navbar__toggle-input {
+    display: none !important;
+}
+
+.rl-navbar__toggle-button {
     display: none;
 }
 
 @media (max-width: 960px) {
-    .header-inner {
-        grid-template-columns: auto auto auto;
-        justify-content: space-between;
+    .rl-navbar__inner {
+        gap: .65rem;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        min-height: auto;
+        padding: .75rem .95rem;
     }
 
-    .brand {
+    .rl-navbar__brand {
         min-width: 0;
     }
 
-    .brand small {
+    .rl-navbar__brand-text small {
         display: none;
     }
 
-    .navbar-toggler {
-        appearance: none;
-        display: block;
-        height: 1px;
-        opacity: 0;
-        position: absolute;
-        width: 1px;
+    .rl-navbar__account {
+        grid-column: 2;
+        grid-row: 1;
     }
 
-    .navbar-toggle-label {
+    .rl-navbar__toggle-button {
         align-items: center;
         border: 1px solid #d7e2df;
         border-radius: 8px;
         cursor: pointer;
         display: grid;
         gap: 4px;
+        grid-column: 3;
+        grid-row: 1;
         height: 40px;
         justify-content: center;
         width: 44px;
     }
 
-    .navbar-toggle-label span {
+    .rl-navbar__toggle-button span {
         background: #103d35;
         border-radius: 999px;
         display: block;
@@ -152,40 +182,36 @@
         width: 18px;
     }
 
-    .nav-scrollable {
+    .rl-navbar__links {
         background: #fff;
         border-top: 1px solid #edf2f0;
         display: none;
         grid-column: 1 / -1;
+        grid-row: 2;
         justify-content: start;
-        overflow-x: auto;
-        padding: .75rem 0;
+        padding: .75rem 0 0;
     }
 
-    .navbar-toggler:checked ~ .nav-scrollable {
+    .rl-navbar__toggle-input:checked ~ .rl-navbar__links {
         display: flex;
-    }
-
-    .account-nav {
-        justify-self: end;
     }
 }
 
 @media (max-width: 560px) {
-    .header-inner {
-        gap: .65rem;
-        padding: 0 .85rem;
-    }
-
-    .brand strong {
+    .rl-navbar__brand-text strong {
         font-size: .95rem;
     }
 
-    .account-name {
+    .rl-navbar__brand-mark {
+        height: 38px;
+        width: 38px;
+    }
+
+    .rl-navbar__account-name {
         display: none;
     }
 
-    .account-button {
-        padding: .45rem .65rem;
+    .rl-navbar__account-button {
+        padding: .5rem .7rem;
     }
 }
