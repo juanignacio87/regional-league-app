@@ -19,12 +19,12 @@
 
 @if (!string.IsNullOrWhiteSpace(successMessage))
 {
-    <div class="alert alert-success">@successMessage</div>
+    <div class="alert alert-success admin-feedback" role="status" aria-live="polite">@successMessage</div>
 }
 
 @if (!string.IsNullOrWhiteSpace(errorMessage))
 {
-    <div class="alert alert-danger">@errorMessage</div>
+    <div class="alert alert-danger admin-feedback" role="alert">@errorMessage</div>
 }
 
 @if (matches.Count == 0)
@@ -40,41 +40,82 @@ else
                     <p class="eyebrow">Partidos</p>
                     <h2>Fixture cargado</h2>
                 </div>
-                <span>@matches.Count partidos</span>
+                <span>@FilteredMatches.Count de @matches.Count partidos</span>
             </div>
 
-            <table>
-                <thead>
-                    <tr>
-                        <th>Fecha</th>
-                        <th>Partido</th>
-                        <th>Estado</th>
-                        <th>Resultado</th>
-                        <th></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var match in matches)
-                    {
-                        <tr class="@(editing?.MatchId == match.Id ? "is-selected" : string.Empty)">
-                            <td>
-                                <span class="table-kicker">@match.RoundName</span>
-                                @match.StartsAt.LocalDateTime.ToString("dd/MM HH:mm")
-                            </td>
-                            <td>
-                                <strong>@match.HomeTeamName</strong>
-                                <span class="muted-text">vs</span>
-                                <strong>@match.AwayTeamName</strong>
-                            </td>
-                            <td><span class="status-pill @StatusClass(match.Status)">@match.Status</span></td>
-                            <td><strong>@ScoreText(match.HomeScore, match.AwayScore)</strong></td>
-                            <td class="table-actions">
-                                <button type="button" class="admin-link-button" @onclick="() => SelectMatch(match.Id)">Editar</button>
-                            </td>
+            <div class="admin-filters">
+                <div>
+                    <label for="status-filter">Estado</label>
+                    <select id="status-filter" class="form-control" @bind="statusFilter">
+                        <option value="">Todos</option>
+                        @foreach (var status in Enum.GetValues<MatchStatus>())
+                        {
+                            <option value="@status.ToString()">@status</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label for="round-filter">Fecha</label>
+                    <select id="round-filter" class="form-control" @bind="roundFilter">
+                        <option value="">Todas</option>
+                        @foreach (var roundName in RoundOptions)
+                        {
+                            <option value="@roundName">@roundName</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label for="club-filter">Club / equipo</label>
+                    <select id="club-filter" class="form-control" @bind="clubFilter">
+                        <option value="">Todos</option>
+                        @foreach (var clubName in ClubOptions)
+                        {
+                            <option value="@clubName">@clubName</option>
+                        }
+                    </select>
+                </div>
+                <button type="button" class="admin-link-button admin-clear-button" @onclick="ClearFilters">Limpiar</button>
+            </div>
+
+            @if (FilteredMatches.Count == 0)
+            {
+                <EmptyState Text="No hay partidos que coincidan con los filtros." />
+            }
+            else
+            {
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Partido</th>
+                            <th>Estado</th>
+                            <th>Resultado</th>
+                            <th></th>
                         </tr>
-                    }
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        @foreach (var match in FilteredMatches)
+                        {
+                            <tr class="@(editing?.MatchId == match.Id ? "is-selected" : string.Empty)">
+                                <td>
+                                    <span class="table-kicker">@match.RoundName</span>
+                                    @match.StartsAt.LocalDateTime.ToString("dd/MM HH:mm")
+                                </td>
+                                <td>
+                                    <strong>@match.HomeTeamName</strong>
+                                    <span class="muted-text">vs</span>
+                                    <strong>@match.AwayTeamName</strong>
+                                </td>
+                                <td><span class="status-pill @StatusClass(match.Status)">@match.Status</span></td>
+                                <td><strong>@ScoreText(match.HomeScore, match.AwayScore)</strong></td>
+                                <td class="table-actions">
+                                    <button type="button" class="admin-link-button" @onclick="() => SelectMatch(match.Id)">Editar</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
         </article>
 
         <aside class="panel admin-editor">
@@ -99,7 +140,7 @@ else
                     <div><dt>Visitante</dt><dd>@editing.AwayTeamName</dd></div>
                 </dl>
 
-                <EditForm Model="editing" OnValidSubmit="SaveAsync" class="admin-form">
+                <EditForm Model="editing" OnValidSubmit="SaveAsync" class="admin-form" aria-busy="@isSaving">
                     <DataAnnotationsValidator />
                     <ValidationSummary />
 
@@ -137,6 +178,27 @@ else
     private bool isSaving;
     private string? successMessage;
     private string? errorMessage;
+    private string statusFilter = string.Empty;
+    private string roundFilter = string.Empty;
+    private string clubFilter = string.Empty;
+
+    private List<AdminMatchRow> FilteredMatches => matches
+        .Where(match => string.IsNullOrWhiteSpace(statusFilter) || match.Status.ToString() == statusFilter)
+        .Where(match => string.IsNullOrWhiteSpace(roundFilter) || match.RoundName == roundFilter)
+        .Where(match => string.IsNullOrWhiteSpace(clubFilter) || match.HomeTeamName == clubFilter || match.AwayTeamName == clubFilter)
+        .ToList();
+
+    private List<string> RoundOptions => matches
+        .Select(match => match.RoundName)
+        .Distinct()
+        .OrderBy(roundName => roundName)
+        .ToList();
+
+    private List<string> ClubOptions => matches
+        .SelectMany(match => new[] { match.HomeTeamName, match.AwayTeamName })
+        .Distinct()
+        .OrderBy(clubName => clubName)
+        .ToList();
 
     protected override async Task OnInitializedAsync()
     {
@@ -190,6 +252,13 @@ else
             HomeScore = match.HomeScore,
             AwayScore = match.AwayScore
         };
+    }
+
+    private void ClearFilters()
+    {
+        statusFilter = string.Empty;
+        roundFilter = string.Empty;
+        clubFilter = string.Empty;
     }
 
     private async Task SaveAsync()

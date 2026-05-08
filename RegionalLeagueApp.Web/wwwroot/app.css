@@ -441,6 +441,30 @@ p {
     min-width: 760px;
 }
 
+.admin-feedback {
+    border-radius: 8px;
+    font-weight: 700;
+}
+
+.admin-filters {
+    align-items: end;
+    background: #fbfdfc;
+    border: 1px solid #edf2f0;
+    border-radius: 8px;
+    display: grid;
+    gap: .75rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+    margin-bottom: 1rem;
+    padding: .85rem;
+}
+
+.admin-filters label {
+    color: #40514d;
+    font-size: .85rem;
+    font-weight: 800;
+    margin-bottom: .25rem;
+}
+
 .table-actions {
     text-align: right;
 }
@@ -452,6 +476,10 @@ p {
     color: #0f4f43;
     font-weight: 800;
     padding: .35rem .65rem;
+}
+
+.admin-clear-button {
+    min-height: 38px;
 }
 
 .admin-editor {
@@ -554,6 +582,10 @@ p {
     .admin-editor {
         position: static;
     }
+
+    .admin-filters {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 
 @media (max-width: 560px) {
@@ -580,6 +612,10 @@ p {
     }
 
     .score-edit-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-filters {
         grid-template-columns: 1fr;
     }
 }
