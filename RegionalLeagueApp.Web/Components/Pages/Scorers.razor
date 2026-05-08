@@ -45,16 +45,16 @@ else
     {
         var goalEvents = await Db.MatchEvents
             .AsNoTracking()
-            .Where(x => x.PlayerId != null &&
-                (x.Type == MatchEventType.Goal || x.Type == MatchEventType.PenaltyScored))
+            .Where(x => x.Type == MatchEventType.Goal && x.PlayerName != string.Empty)
             .Select(x => new
             {
-                PlayerName = x.Player!.FirstName + " " + x.Player.LastName,
-                TeamName = x.Player.Team!.Club!.Name
+                x.PlayerName,
+                TeamName = x.Team != null ? x.Team.Club!.Name : "Sin equipo"
             })
             .ToListAsync();
 
         scorers = goalEvents
+            .Where(x => !string.IsNullOrWhiteSpace(x.PlayerName))
             .GroupBy(x => new { x.PlayerName, x.TeamName })
             .Select(group => new ScorerRow(
                 group.Key.PlayerName,
