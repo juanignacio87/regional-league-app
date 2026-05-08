@@ -1,0 +1,15 @@
+C:\Users\juani\Documents\Playground\RegionalLeagueApp.Application\bin\Debug\net8.0\RegionalLeagueApp.Application.deps.json
+C:\Users\juani\Documents\Playground\RegionalLeagueApp.Application\bin\Debug\net8.0\RegionalLeagueApp.Application.dll
+C:\Users\juani\Documents\Playground\RegionalLeagueApp.Application\bin\Debug\net8.0\RegionalLeagueApp.Application.pdb
+C:\Users\juani\Documents\Playground\RegionalLeagueApp.Application\bin\Debug\net8.0\RegionalLeagueApp.Domain.dll
+C:\Users\juani\Documents\Playground\RegionalLeagueApp.Application\bin\Debug\net8.0\RegionalLeagueApp.Domain.pdb
+C:\Users\juani\Documents\Playground\RegionalLeagueApp.Application\obj\Debug\net8.0\RegionalLeagueApp.Application.csproj.AssemblyReference.cache
+C:\Users\juani\Documents\Playground\RegionalLeagueApp.Application\obj\Debug\net8.0\RegionalLeagueApp.Application.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\juani\Documents\Playground\RegionalLeagueApp.Application\obj\Debug\net8.0\RegionalLeagueApp.Application.AssemblyInfoInputs.cache
+C:\Users\juani\Documents\Playground\RegionalLeagueApp.Application\obj\Debug\net8.0\RegionalLeagueApp.Application.AssemblyInfo.cs
+C:\Users\juani\Documents\Playground\RegionalLeagueApp.Application\obj\Debug\net8.0\RegionalLeagueApp.Application.csproj.CoreCompileInputs.cache
+C:\Users\juani\Documents\Playground\RegionalLeagueApp.Application\obj\Debug\net8.0\Regional.8C838459.Up2Date
+C:\Users\juani\Documents\Playground\RegionalLeagueApp.Application\obj\Debug\net8.0\RegionalLeagueApp.Application.dll
+C:\Users\juani\Documents\Playground\RegionalLeagueApp.Application\obj\Debug\net8.0\refint\RegionalLeagueApp.Application.dll
+C:\Users\juani\Documents\Playground\RegionalLeagueApp.Application\obj\Debug\net8.0\RegionalLeagueApp.Application.pdb
+C:\Users\juani\Documents\Playground\RegionalLeagueApp.Application\obj\Debug\net8.0\ref\RegionalLeagueApp.Application.dll

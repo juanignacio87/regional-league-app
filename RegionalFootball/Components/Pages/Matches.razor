@@ -1,0 +1,48 @@
+@page "/matches"
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+
+<PageTitle>Fixture</PageTitle>
+
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">Matches</p>
+        <h1>Fixture y resultados</h1>
+    </div>
+</div>
+
+<section class="panel">
+    @foreach (var group in matches.GroupBy(x => x.Round?.Name ?? "Sin fecha"))
+    {
+        <h2>@group.Key</h2>
+        @foreach (var match in group)
+        {
+            <a class="fixture-row" href="matches/@match.Id">
+                <span>@match.StartsAt.LocalDateTime.ToString("dd/MM HH:mm")</span>
+                <strong>@match.HomeTeam?.Club?.Name</strong>
+                <b>@Score(match)</b>
+                <strong>@match.AwayTeam?.Club?.Name</strong>
+                <small class="status-pill">@match.Status</small>
+            </a>
+        }
+    }
+</section>
+
+@code {
+    private List<Match> matches = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        matches = await Db.Matches
+            .AsNoTracking()
+            .Include(x => x.Round)
+            .Include(x => x.HomeTeam)!.ThenInclude(x => x!.Club)
+            .Include(x => x.AwayTeam)!.ThenInclude(x => x!.Club)
+            .OrderBy(x => x.Round!.SortOrder)
+            .ThenBy(x => x.StartsAt)
+            .ToListAsync();
+    }
+
+    private static string Score(Match match) =>
+        match.HomeScore is null || match.AwayScore is null ? "vs" : $"{match.HomeScore}-{match.AwayScore}";
+}

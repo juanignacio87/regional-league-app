@@ -1,0 +1,60 @@
+@page "/clubs/{Id:guid}"
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+
+<PageTitle>Club</PageTitle>
+
+@if (club is null)
+{
+    <EmptyState Text="Club no encontrado." />
+}
+else
+{
+    <section class="club-header" style="border-color:@(club.PrimaryColor ?? "#14532d")">
+        <div>
+            <p class="eyebrow">@club.ShortName</p>
+            <h1>@club.Name</h1>
+            <p>@club.Venue?.Name, @club.Venue?.City</p>
+        </div>
+        <strong>@(club.FoundedYear?.ToString() ?? "S/D")</strong>
+    </section>
+
+    @foreach (var team in club.Teams.OrderBy(x => x.Name))
+    {
+        <section class="panel section-gap">
+            <h2>@team.Name</h2>
+            @if (team.Players.Count == 0)
+            {
+                <EmptyState Text="Plantel pendiente de carga." />
+            }
+            else
+            {
+                <div class="player-grid">
+                    @foreach (var player in team.Players.OrderBy(x => x.ShirtNumber ?? 999).ThenBy(x => x.LastName))
+                    {
+                        <div class="player-row">
+                            <strong>@(player.ShirtNumber?.ToString() ?? "-")</strong>
+                            <span>@player.FullName</span>
+                            <small>@player.Position</small>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+    }
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private Club? club;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        club = await Db.Clubs
+            .AsNoTracking()
+            .Include(x => x.Venue)
+            .Include(x => x.Teams)
+            .ThenInclude(x => x.Players)
+            .FirstOrDefaultAsync(x => x.Id == Id);
+    }
+}

@@ -1,0 +1,67 @@
+@page "/matches/{Id:int}"
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+
+<PageTitle>Partido</PageTitle>
+
+@if (match is null)
+{
+    <p>Cargando...</p>
+}
+else
+{
+    <section class="match-detail">
+        <div>
+            <small>@match.Round?.Name - @match.StartsAt.LocalDateTime.ToString("dd/MM/yyyy HH:mm")</small>
+            <h1>@match.HomeTeam?.Club?.Name</h1>
+        </div>
+        <strong>@Score(match)</strong>
+        <div>
+            <small>@match.Status</small>
+            <h1>@match.AwayTeam?.Club?.Name</h1>
+        </div>
+    </section>
+
+    <section class="dashboard-grid">
+        <article class="panel">
+            <h2>Eventos</h2>
+            @if (match.Events.Count == 0)
+            {
+                <p class="muted">Todavia no hay eventos cargados.</p>
+            }
+            @foreach (var ev in match.Events.OrderBy(x => x.Minute))
+            {
+                <div class="event-row">
+                    <strong>@ev.Minute'</strong>
+                    <span>@ev.Type</span>
+                    <small>@ev.Player?.FullName @ev.Notes</small>
+                </div>
+            }
+        </article>
+        <article class="panel">
+            <h2>Sede</h2>
+            <p>@match.Venue?.Name</p>
+            <p class="muted">@match.Venue?.City</p>
+        </article>
+    </section>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private Match? match;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        match = await Db.Matches
+            .AsNoTracking()
+            .Include(x => x.Round)
+            .Include(x => x.Venue)
+            .Include(x => x.HomeTeam)!.ThenInclude(x => x!.Club)
+            .Include(x => x.AwayTeam)!.ThenInclude(x => x!.Club)
+            .Include(x => x.Events)!.ThenInclude(x => x.Player)
+            .FirstOrDefaultAsync(x => x.Id == Id);
+    }
+
+    private static string Score(Match item) =>
+        item.HomeScore is null || item.AwayScore is null ? "vs" : $"{item.HomeScore}-{item.AwayScore}";
+}

@@ -1,0 +1,35 @@
+@page "/login"
+
+<PageTitle>Ingresar</PageTitle>
+
+<div class="auth-panel">
+    <h1>Ingresar</h1>
+    <p>Usa una cuenta creada por administracion.</p>
+
+    @if (Error == "1")
+    {
+        <div class="alert alert-danger">Email o password invalidos.</div>
+    }
+
+    <form method="post" action="/account/login">
+        <input type="hidden" name="ReturnUrl" value="@ReturnUrl" />
+
+        <label for="email">Email</label>
+        <input id="email" class="form-control" name="Email" type="email" autocomplete="username" required />
+
+        <label for="password">Password</label>
+        <input id="password" class="form-control" name="Password" type="password" autocomplete="current-password" required />
+
+        <label class="checkbox-line">
+            <input name="RememberMe" type="checkbox" value="true" />
+            Recordarme
+        </label>
+
+        <button class="btn btn-primary" type="submit">Ingresar</button>
+    </form>
+</div>
+
+@code {
+    [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+    [SupplyParameterFromQuery] public string? Error { get; set; }
+}

@@ -1,0 +1,47 @@
+@page "/fixture"
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+
+<PageTitle>Fixture</PageTitle>
+
+<div class="page-heading">
+    <p class="eyebrow">Fixture</p>
+    <h1>Partidos programados</h1>
+</div>
+
+@if (matches.Count == 0)
+{
+    <EmptyState Text="No hay partidos programados." />
+}
+else
+{
+    @foreach (var group in matches.GroupBy(x => x.Round?.Name ?? "Sin fecha"))
+    {
+        <section class="panel section-gap">
+            <h2>@group.Key</h2>
+            <div class="match-list">
+                @foreach (var match in group)
+                {
+                    <MatchSummary Match="match" />
+                }
+            </div>
+        </section>
+    }
+}
+
+@code {
+    private List<Match> matches = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        matches = await Db.Matches
+            .AsNoTracking()
+            .Include(x => x.Round)
+            .Include(x => x.HomeTeam)!.ThenInclude(x => x!.Club)
+            .Include(x => x.AwayTeam)!.ThenInclude(x => x!.Club)
+            .Where(x => x.Status == MatchStatus.Scheduled || x.Status == MatchStatus.Postponed)
+            .OrderBy(x => x.Round!.SortOrder)
+            .ThenBy(x => x.StartsAt)
+            .ToListAsync();
+    }
+}

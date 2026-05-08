@@ -1,0 +1,3 @@
+﻿<Project>
+  <Import Project="..\build\RegionalLeagueApp.Web.props" />
+</Project>

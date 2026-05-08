@@ -1,0 +1,11 @@
+C:\Users\juani\Documents\Playground\RegionalLeagueApp.Domain\bin\Debug\net8.0\RegionalLeagueApp.Domain.deps.json
+C:\Users\juani\Documents\Playground\RegionalLeagueApp.Domain\bin\Debug\net8.0\RegionalLeagueApp.Domain.dll
+C:\Users\juani\Documents\Playground\RegionalLeagueApp.Domain\bin\Debug\net8.0\RegionalLeagueApp.Domain.pdb
+C:\Users\juani\Documents\Playground\RegionalLeagueApp.Domain\obj\Debug\net8.0\RegionalLeagueApp.Domain.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\juani\Documents\Playground\RegionalLeagueApp.Domain\obj\Debug\net8.0\RegionalLeagueApp.Domain.AssemblyInfoInputs.cache
+C:\Users\juani\Documents\Playground\RegionalLeagueApp.Domain\obj\Debug\net8.0\RegionalLeagueApp.Domain.AssemblyInfo.cs
+C:\Users\juani\Documents\Playground\RegionalLeagueApp.Domain\obj\Debug\net8.0\RegionalLeagueApp.Domain.csproj.CoreCompileInputs.cache
+C:\Users\juani\Documents\Playground\RegionalLeagueApp.Domain\obj\Debug\net8.0\RegionalLeagueApp.Domain.dll
+C:\Users\juani\Documents\Playground\RegionalLeagueApp.Domain\obj\Debug\net8.0\refint\RegionalLeagueApp.Domain.dll
+C:\Users\juani\Documents\Playground\RegionalLeagueApp.Domain\obj\Debug\net8.0\RegionalLeagueApp.Domain.pdb
+C:\Users\juani\Documents\Playground\RegionalLeagueApp.Domain\obj\Debug\net8.0\ref\RegionalLeagueApp.Domain.dll

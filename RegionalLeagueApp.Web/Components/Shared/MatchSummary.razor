@@ -1,0 +1,21 @@
+<a class="match-card" href="matches/@Match.Id">
+    <div class="match-meta">
+        <span>@Match.Round?.Name</span>
+        <span>@Match.StartsAt.LocalDateTime.ToString("dd/MM HH:mm")</span>
+    </div>
+    <div class="score-line">
+        <strong>@Match.HomeTeam?.Club?.ShortName</strong>
+        <b>@ScoreText</b>
+        <strong>@Match.AwayTeam?.Club?.ShortName</strong>
+    </div>
+    <small class="status-pill">@Match.Status</small>
+</a>
+
+@code {
+    [Parameter, EditorRequired] public Match Match { get; set; } = default!;
+
+    private string ScoreText =>
+        Match.HomeScore is null || Match.AwayScore is null
+            ? "vs"
+            : $"{Match.HomeScore}-{Match.AwayScore}";
+}

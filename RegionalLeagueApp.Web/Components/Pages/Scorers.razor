@@ -1,0 +1,68 @@
+@page "/scorers"
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+
+<PageTitle>Goleadores</PageTitle>
+
+<div class="page-heading">
+    <p class="eyebrow">Goleadores</p>
+    <h1>Ranking de goleadores</h1>
+</div>
+
+@if (scorers.Count == 0)
+{
+    <EmptyState Text="Todavia no hay goles asociados a jugadores." />
+}
+else
+{
+    <section class="panel table-panel">
+        <table>
+            <thead>
+                <tr>
+                    <th>Jugador</th>
+                    <th>Equipo</th>
+                    <th>Goles</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var scorer in scorers)
+                {
+                    <tr>
+                        <td>@scorer.PlayerName</td>
+                        <td>@scorer.TeamName</td>
+                        <td><strong>@scorer.Goals</strong></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </section>
+}
+
+@code {
+    private List<ScorerRow> scorers = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        scorers = await Db.MatchEvents
+            .AsNoTracking()
+            .Include(x => x.Player)!.ThenInclude(x => x!.Team)!.ThenInclude(x => x!.Club)
+            .Where(x => x.PlayerId != null &&
+                (x.Type == MatchEventType.Goal || x.Type == MatchEventType.PenaltyScored))
+            .GroupBy(x => new
+            {
+                x.PlayerId,
+                x.Player!.FirstName,
+                x.Player.LastName,
+                ClubName = x.Player.Team!.Club!.Name
+            })
+            .Select(group => new ScorerRow(
+                $"{group.Key.FirstName} {group.Key.LastName}",
+                group.Key.ClubName,
+                group.Count()))
+            .OrderByDescending(x => x.Goals)
+            .ThenBy(x => x.PlayerName)
+            .ToListAsync();
+    }
+
+    private sealed record ScorerRow(string PlayerName, string TeamName, int Goals);
+}

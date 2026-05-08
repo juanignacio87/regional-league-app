@@ -1,0 +1,86 @@
+@page "/contributor"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = $"{AppRoles.Contributor},{AppRoles.Moderator},{AppRoles.Admin}")]
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+@inject ProposalService Proposals
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Colaborar</PageTitle>
+
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">Collaboration</p>
+        <h1>Reportar resultado</h1>
+    </div>
+</div>
+
+<section class="panel form-panel">
+    <EditForm Model="form" OnValidSubmit="SubmitAsync">
+        <DataAnnotationsValidator />
+        <label>Partido</label>
+        <InputSelect class="form-control" @bind-Value="form.MatchId">
+            @foreach (var match in matches)
+            {
+                <option value="@match.Id">@match.HomeTeam?.Club?.ShortName vs @match.AwayTeam?.Club?.ShortName - @match.StartsAt.LocalDateTime.ToString("dd/MM")</option>
+            }
+        </InputSelect>
+
+        <label>Goles local</label>
+        <InputNumber class="form-control" @bind-Value="form.HomeScore" />
+
+        <label>Goles visitante</label>
+        <InputNumber class="form-control" @bind-Value="form.AwayScore" />
+
+        <label>Notas</label>
+        <InputTextArea class="form-control" @bind-Value="form.Notes" />
+
+        <button class="btn btn-primary" type="submit">Enviar propuesta</button>
+    </EditForm>
+
+    @if (!string.IsNullOrWhiteSpace(message))
+    {
+        <p class="success-message">@message</p>
+    }
+</section>
+
+@code {
+    private readonly ProposalForm form = new();
+    private List<Match> matches = [];
+    private string? message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        matches = await Db.Matches
+            .AsNoTracking()
+            .Include(x => x.HomeTeam)!.ThenInclude(x => x!.Club)
+            .Include(x => x.AwayTeam)!.ThenInclude(x => x!.Club)
+            .Where(x => x.Status == MatchStatus.Scheduled || x.Status == MatchStatus.Live)
+            .OrderBy(x => x.StartsAt)
+            .ToListAsync();
+
+        form.MatchId = matches.FirstOrDefault()?.Id ?? 0;
+    }
+
+    private async Task SubmitAsync()
+    {
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userId = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrWhiteSpace(userId) || form.MatchId == 0)
+        {
+            return;
+        }
+
+        var proposalId = await Proposals.SubmitMatchResultAsync(form.MatchId, userId, form.HomeScore, form.AwayScore, form.Notes);
+        message = $"Propuesta #{proposalId} enviada para revision.";
+    }
+
+    private sealed class ProposalForm
+    {
+        public int MatchId { get; set; }
+        public int HomeScore { get; set; }
+        public int AwayScore { get; set; }
+        public string Notes { get; set; } = string.Empty;
+    }
+}

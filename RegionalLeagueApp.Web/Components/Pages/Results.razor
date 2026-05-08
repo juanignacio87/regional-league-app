@@ -1,0 +1,46 @@
+@page "/results"
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+
+<PageTitle>Resultados</PageTitle>
+
+<div class="page-heading">
+    <p class="eyebrow">Resultados</p>
+    <h1>Partidos finalizados</h1>
+</div>
+
+@if (matches.Count == 0)
+{
+    <EmptyState Text="Todavia no hay resultados cargados." />
+}
+else
+{
+    @foreach (var group in matches.GroupBy(x => x.Round?.Name ?? "Sin fecha"))
+    {
+        <section class="panel section-gap">
+            <h2>@group.Key</h2>
+            <div class="match-list">
+                @foreach (var match in group)
+                {
+                    <MatchSummary Match="match" />
+                }
+            </div>
+        </section>
+    }
+}
+
+@code {
+    private List<Match> matches = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        matches = await Db.Matches
+            .AsNoTracking()
+            .Include(x => x.Round)
+            .Include(x => x.HomeTeam)!.ThenInclude(x => x!.Club)
+            .Include(x => x.AwayTeam)!.ThenInclude(x => x!.Club)
+            .Where(x => x.Status == MatchStatus.Finished)
+            .OrderByDescending(x => x.StartsAt)
+            .ToListAsync();
+    }
+}

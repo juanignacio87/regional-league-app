@@ -1,0 +1,53 @@
+@page "/clubs/{Id:int}"
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+
+<PageTitle>Club</PageTitle>
+
+@if (club is null)
+{
+    <p>Cargando...</p>
+}
+else
+{
+    <section class="club-header" style="border-color:@club.PrimaryColor">
+        <div>
+            <p class="eyebrow">@club.ShortName</p>
+            <h1>@club.Name</h1>
+            <p>@club.Venue?.Name, @club.Venue?.City</p>
+        </div>
+        <strong>@club.FoundedYear</strong>
+    </section>
+
+    @foreach (var team in club.Teams)
+    {
+        <section class="panel">
+            <h2>@team.Category</h2>
+            <div class="player-grid">
+                @foreach (var player in team.Players.OrderBy(x => x.ShirtNumber))
+                {
+                    <div class="player-row">
+                        <strong>@player.ShirtNumber</strong>
+                        <span>@player.FullName</span>
+                        <small>@player.Position</small>
+                    </div>
+                }
+            </div>
+        </section>
+    }
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private Club? club;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        club = await Db.Clubs
+            .AsNoTracking()
+            .Include(x => x.Venue)
+            .Include(x => x.Teams)
+            .ThenInclude(x => x.Players)
+            .FirstOrDefaultAsync(x => x.Id == Id);
+    }
+}

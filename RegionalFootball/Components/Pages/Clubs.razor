@@ -1,0 +1,36 @@
+@page "/clubs"
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+
+<PageTitle>Clubes</PageTitle>
+
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">Clubs</p>
+        <h1>Clubes y planteles</h1>
+    </div>
+</div>
+
+<section class="club-grid">
+    @foreach (var club in clubs)
+    {
+        <a class="club-card" href="clubs/@club.Id">
+            <span class="club-color" style="background:@club.PrimaryColor"></span>
+            <strong>@club.Name</strong>
+            <small>@club.Venue?.Name - Fundado en @club.FoundedYear</small>
+        </a>
+    }
+</section>
+
+@code {
+    private List<Club> clubs = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        clubs = await Db.Clubs
+            .AsNoTracking()
+            .Include(x => x.Venue)
+            .OrderBy(x => x.Name)
+            .ToListAsync();
+    }
+}

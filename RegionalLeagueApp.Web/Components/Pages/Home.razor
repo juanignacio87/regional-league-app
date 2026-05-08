@@ -1,0 +1,92 @@
+@page "/"
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+
+<PageTitle>Liga Regional</PageTitle>
+
+<section class="page-hero">
+    <div>
+        <p class="eyebrow">Liga Regional</p>
+        <h1>Fixture, resultados y tabla de posiciones</h1>
+        <p>Informacion publica de la competencia regional, preparada para crecer con carga colaborativa y moderacion.</p>
+    </div>
+</section>
+
+<section class="content-grid">
+    <article class="panel">
+        <div class="panel-title">
+            <h2>Proximos partidos</h2>
+            <a href="fixture">Ver fixture</a>
+        </div>
+        @if (upcomingMatches.Count == 0)
+        {
+            <p class="muted">No hay partidos programados.</p>
+        }
+        @foreach (var match in upcomingMatches)
+        {
+            <MatchSummary Match="match" />
+        }
+    </article>
+
+    <article class="panel">
+        <div class="panel-title">
+            <h2>Ultimos resultados</h2>
+            <a href="results">Ver resultados</a>
+        </div>
+        @if (latestResults.Count == 0)
+        {
+            <p class="muted">Todavia no hay resultados.</p>
+        }
+        @foreach (var match in latestResults)
+        {
+            <MatchSummary Match="match" />
+        }
+    </article>
+
+    <article class="panel">
+        <div class="panel-title">
+            <h2>En vivo / destacados</h2>
+        </div>
+        @if (featuredMatches.Count == 0)
+        {
+            <p class="muted">No hay partidos en vivo ahora.</p>
+        }
+        @foreach (var match in featuredMatches)
+        {
+            <MatchSummary Match="match" />
+        }
+    </article>
+</section>
+
+@code {
+    private List<Match> upcomingMatches = [];
+    private List<Match> latestResults = [];
+    private List<Match> featuredMatches = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        upcomingMatches = await MatchQuery()
+            .Where(x => x.Status == MatchStatus.Scheduled)
+            .OrderBy(x => x.StartsAt)
+            .Take(5)
+            .ToListAsync();
+
+        latestResults = await MatchQuery()
+            .Where(x => x.Status == MatchStatus.Finished)
+            .OrderByDescending(x => x.StartsAt)
+            .Take(5)
+            .ToListAsync();
+
+        featuredMatches = await MatchQuery()
+            .Where(x => x.Status == MatchStatus.Live || x.Status == MatchStatus.HalfTime)
+            .OrderBy(x => x.StartsAt)
+            .Take(5)
+            .ToListAsync();
+    }
+
+    private IQueryable<Match> MatchQuery() => Db.Matches
+        .AsNoTracking()
+        .Include(x => x.Round)
+        .Include(x => x.HomeTeam)!.ThenInclude(x => x!.Club)
+        .Include(x => x.AwayTeam)!.ThenInclude(x => x!.Club);
+}

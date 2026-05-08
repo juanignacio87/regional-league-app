@@ -1,0 +1,41 @@
+@page "/clubs"
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+
+<PageTitle>Clubes</PageTitle>
+
+<div class="page-heading">
+    <p class="eyebrow">Clubes</p>
+    <h1>Clubes participantes</h1>
+</div>
+
+@if (clubs.Count == 0)
+{
+    <EmptyState Text="No hay clubes cargados." />
+}
+else
+{
+    <section class="club-grid">
+        @foreach (var club in clubs)
+        {
+            <a class="club-card" href="clubs/@club.Id">
+                <span class="club-dot" style="background:@(club.PrimaryColor ?? "#14532d")"></span>
+                <strong>@club.Name</strong>
+                <small>@club.Venue?.Name - @club.Venue?.City</small>
+            </a>
+        }
+    </section>
+}
+
+@code {
+    private List<Club> clubs = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        clubs = await Db.Clubs
+            .AsNoTracking()
+            .Include(x => x.Venue)
+            .OrderBy(x => x.Name)
+            .ToListAsync();
+    }
+}
