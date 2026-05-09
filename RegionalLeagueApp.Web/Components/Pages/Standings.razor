@@ -1,6 +1,9 @@
 @page "/standings"
+@rendermode InteractiveServer
+@implements IDisposable
 @using RegionalLeagueApp.Application.Standings
 @inject IStandingsQueryService StandingsQueryService
+@inject MatchUpdatesClient MatchUpdatesClient
 
 <PageTitle>Tabla</PageTitle>
 
@@ -54,8 +57,38 @@ else
 
 @code {
     private IReadOnlyList<StandingRowDto> standings = [];
+    private Func<Task>? reloadHandler;
 
     protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        reloadHandler = () => InvokeAsync(async () =>
+        {
+            await LoadAsync();
+            StateHasChanged();
+        });
+
+        await MatchUpdatesClient.SubscribeAsync(reloadHandler);
+    }
+
+    public void Dispose()
+    {
+        if (reloadHandler is not null)
+        {
+            MatchUpdatesClient.Unsubscribe(reloadHandler);
+        }
+    }
+
+    private async Task LoadAsync()
     {
         standings = await StandingsQueryService.GetStandingsAsync();
     }

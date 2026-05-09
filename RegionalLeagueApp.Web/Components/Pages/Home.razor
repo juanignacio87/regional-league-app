@@ -1,6 +1,9 @@
 @page "/"
+@rendermode InteractiveServer
+@implements IDisposable
 @using Microsoft.EntityFrameworkCore
 @inject ApplicationDbContext Db
+@inject MatchUpdatesClient MatchUpdatesClient
 
 <PageTitle>Liga Regional</PageTitle>
 
@@ -66,8 +69,38 @@
     private List<Match> upcomingMatches = [];
     private List<Match> latestResults = [];
     private List<Match> featuredMatches = [];
+    private Func<Task>? reloadHandler;
 
     protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        reloadHandler = () => InvokeAsync(async () =>
+        {
+            await LoadAsync();
+            StateHasChanged();
+        });
+
+        await MatchUpdatesClient.SubscribeAsync(reloadHandler);
+    }
+
+    public void Dispose()
+    {
+        if (reloadHandler is not null)
+        {
+            MatchUpdatesClient.Unsubscribe(reloadHandler);
+        }
+    }
+
+    private async Task LoadAsync()
     {
         upcomingMatches = await MatchQuery()
             .Where(x => x.Status == MatchStatus.Scheduled)

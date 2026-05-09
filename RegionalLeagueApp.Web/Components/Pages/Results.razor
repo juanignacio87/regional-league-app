@@ -1,6 +1,9 @@
 @page "/results"
+@rendermode InteractiveServer
+@implements IDisposable
 @using Microsoft.EntityFrameworkCore
 @inject ApplicationDbContext Db
+@inject MatchUpdatesClient MatchUpdatesClient
 
 <PageTitle>Resultados</PageTitle>
 
@@ -31,8 +34,38 @@ else
 
 @code {
     private List<Match> matches = [];
+    private Func<Task>? reloadHandler;
 
     protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        reloadHandler = () => InvokeAsync(async () =>
+        {
+            await LoadAsync();
+            StateHasChanged();
+        });
+
+        await MatchUpdatesClient.SubscribeAsync(reloadHandler);
+    }
+
+    public void Dispose()
+    {
+        if (reloadHandler is not null)
+        {
+            MatchUpdatesClient.Unsubscribe(reloadHandler);
+        }
+    }
+
+    private async Task LoadAsync()
     {
         matches = await Db.Matches
             .AsNoTracking()

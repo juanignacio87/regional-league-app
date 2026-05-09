@@ -1,6 +1,9 @@
 @page "/matches/{Id:guid}"
+@rendermode InteractiveServer
+@implements IDisposable
 @using Microsoft.EntityFrameworkCore
 @inject ApplicationDbContext Db
+@inject MatchUpdatesClient MatchUpdatesClient
 
 <PageTitle>Partido</PageTitle>
 
@@ -59,8 +62,38 @@ else
 @code {
     [Parameter] public Guid Id { get; set; }
     private Match? match;
+    private Func<Task>? reloadHandler;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        reloadHandler = () => InvokeAsync(async () =>
+        {
+            await LoadAsync();
+            StateHasChanged();
+        });
+
+        await MatchUpdatesClient.SubscribeAsync(reloadHandler);
+    }
 
     protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    public void Dispose()
+    {
+        if (reloadHandler is not null)
+        {
+            MatchUpdatesClient.Unsubscribe(reloadHandler);
+        }
+    }
+
+    private async Task LoadAsync()
     {
         match = await Db.Matches
             .AsNoTracking()

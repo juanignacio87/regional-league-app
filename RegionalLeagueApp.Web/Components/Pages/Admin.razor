@@ -2,10 +2,14 @@
 @rendermode InteractiveServer
 @attribute [Authorize(Policy = "RequireModerator")]
 @using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.SignalR
 @using Microsoft.EntityFrameworkCore
 @using RegionalLeagueApp.Application.Standings
+@using RegionalLeagueApp.Web.Hubs
 @inject ApplicationDbContext Db
 @inject IStandingsRecalculationService StandingsRecalculationService
+@inject IHubContext<MatchUpdatesHub> MatchUpdates
+@inject ILogger<Admin> Logger
 
 <PageTitle>Admin</PageTitle>
 
@@ -386,6 +390,7 @@ else
             var selectedMatchId = editing.MatchId;
             await LoadMatchesAsync();
             await SelectMatchAsync(selectedMatchId);
+            await NotifyMatchDataChangedAsync();
 
             successMessage = "Resultado actualizado correctamente.";
         }
@@ -446,6 +451,7 @@ else
             await LoadSelectedEventsAsync(editing.MatchId);
             eventForm.PlayerName = string.Empty;
             eventForm.Minute = 0;
+            await NotifyMatchDataChangedAsync();
             successMessage = "Evento agregado correctamente.";
         }
         catch (Exception)
@@ -478,7 +484,14 @@ else
         Db.MatchEvents.Remove(matchEvent);
         await Db.SaveChangesAsync();
         await LoadSelectedEventsAsync(editing.MatchId);
+        await NotifyMatchDataChangedAsync();
         successMessage = "Evento eliminado correctamente.";
+    }
+
+    private async Task NotifyMatchDataChangedAsync()
+    {
+        await MatchUpdates.Clients.All.SendAsync(MatchUpdatesHub.MatchDataChanged);
+        Logger.LogInformation("SignalR notification {EventName} emitted.", MatchUpdatesHub.MatchDataChanged);
     }
 
     private static string? Validate(MatchEditModel model)

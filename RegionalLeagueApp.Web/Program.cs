@@ -6,6 +6,7 @@ using RegionalLeagueApp.Application.Abstractions.Identity;
 using RegionalLeagueApp.Infrastructure;
 using RegionalLeagueApp.Infrastructure.Identity;
 using RegionalLeagueApp.Infrastructure.Seed;
+using RegionalLeagueApp.Web.Hubs;
 using RegionalLeagueApp.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -20,6 +21,8 @@ builder.Services.AddRazorComponents()
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
+builder.Services.AddScoped<MatchUpdatesClient>();
+builder.Services.AddSignalR();
 
 builder.Services
     .AddAuthentication(IdentityConstants.ApplicationScheme)
@@ -81,6 +84,8 @@ app.MapPost("/account/logout", async (SignInManager<ApplicationIdentityUser> sig
     await signInManager.SignOutAsync();
     return Results.LocalRedirect("/");
 }).DisableAntiforgery();
+
+app.MapHub<MatchUpdatesHub>(MatchUpdatesHub.Route);
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
