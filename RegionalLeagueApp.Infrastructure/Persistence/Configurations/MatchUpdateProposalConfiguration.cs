@@ -14,10 +14,13 @@ public sealed class MatchUpdateProposalConfiguration : IEntityTypeConfiguration<
             table.HasCheckConstraint("ck_match_update_proposals_away_score_non_negative", "\"ProposedAwayScore\" IS NULL OR \"ProposedAwayScore\" >= 0");
         });
         builder.HasKey(x => x.Id);
+        builder.Property(x => x.ChangeType).HasConversion<string>().HasMaxLength(40).IsRequired();
         builder.Property(x => x.ProposedStatus).HasConversion<string>().HasMaxLength(30);
+        builder.Property(x => x.PayloadJson).HasColumnType("jsonb").IsRequired();
         builder.Property(x => x.Status).HasConversion<string>().HasMaxLength(30).IsRequired();
         builder.Property(x => x.Notes).HasMaxLength(1000);
         builder.HasIndex(x => new { x.MatchId, x.Status });
+        builder.HasIndex(x => new { x.Status, x.ChangeType });
         builder.HasIndex(x => x.ProposedByUserId);
 
         builder.HasOne(x => x.ReviewedByUser)

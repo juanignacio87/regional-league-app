@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using RegionalLeagueApp.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using RegionalLeagueApp.Infrastructure.Persistence;
 namespace RegionalLeagueApp.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260509070515_AddContributorTeamAssignments")]
+    partial class AddContributorTeamAssignments
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -340,11 +343,6 @@ namespace RegionalLeagueApp.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("ChangeType")
-                        .IsRequired()
-                        .HasMaxLength(40)
-                        .HasColumnType("character varying(40)");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -354,10 +352,6 @@ namespace RegionalLeagueApp.Infrastructure.Persistence.Migrations
                     b.Property<string>("Notes")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
-
-                    b.Property<string>("PayloadJson")
-                        .IsRequired()
-                        .HasColumnType("jsonb");
 
                     b.Property<int?>("ProposedAwayScore")
                         .HasColumnType("integer");
@@ -390,8 +384,6 @@ namespace RegionalLeagueApp.Infrastructure.Persistence.Migrations
                     b.HasIndex("ReviewedByUserId");
 
                     b.HasIndex("MatchId", "Status");
-
-                    b.HasIndex("Status", "ChangeType");
 
                     b.ToTable("match_update_proposals", null, t =>
                         {

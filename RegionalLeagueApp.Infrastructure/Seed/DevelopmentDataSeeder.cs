@@ -32,6 +32,7 @@ public sealed class DevelopmentDataSeeder(
         await SeedRolesAsync(cancellationToken);
         await SeedAdminAsync(cancellationToken);
         await SeedLeagueDataAsync(cancellationToken);
+        await SeedCollaborationUsersAsync(cancellationToken);
     }
 
     private async Task SeedRolesAsync(CancellationToken cancellationToken)
@@ -47,35 +48,51 @@ public sealed class DevelopmentDataSeeder(
 
     private async Task SeedAdminAsync(CancellationToken cancellationToken)
     {
-        var identityUser = await userManager.FindByEmailAsync(seedOptions.AdminEmail);
+        var identityUser = await CreateIdentityUserAsync(
+            seedOptions.AdminEmail,
+            seedOptions.AdminPassword,
+            seedOptions.AdminDisplayName,
+            AppRoles.Admin,
+            cancellationToken);
+    }
 
+    private async Task<ApplicationIdentityUser> CreateIdentityUserAsync(
+        string email,
+        string password,
+        string displayName,
+        string role,
+        CancellationToken cancellationToken)
+    {
+        var identityUser = await userManager.FindByEmailAsync(email);
         if (identityUser is null)
         {
             identityUser = new ApplicationIdentityUser
             {
                 Id = Guid.NewGuid(),
-                UserName = seedOptions.AdminEmail,
-                Email = seedOptions.AdminEmail,
+                UserName = email,
+                Email = email,
                 EmailConfirmed = true
             };
 
-            var result = await userManager.CreateAsync(identityUser, seedOptions.AdminPassword);
+            var result = await userManager.CreateAsync(identityUser, password);
             if (!result.Succeeded)
             {
-                throw new InvalidOperationException($"Could not create seed admin user: {string.Join(", ", result.Errors.Select(x => x.Description))}");
+                throw new InvalidOperationException($"Could not create seed user {email}: {string.Join(", ", result.Errors.Select(x => x.Description))}");
             }
         }
 
-        if (!await userManager.IsInRoleAsync(identityUser, AppRoles.Admin))
+        if (!await userManager.IsInRoleAsync(identityUser, role))
         {
-            await userManager.AddToRoleAsync(identityUser, AppRoles.Admin);
+            await userManager.AddToRoleAsync(identityUser, role);
         }
 
         if (!await db.AppUsers.AnyAsync(x => x.Id == identityUser.Id, cancellationToken))
         {
-            db.AppUsers.Add(new DomainUser(identityUser.Id, seedOptions.AdminEmail, seedOptions.AdminDisplayName));
+            db.AppUsers.Add(new DomainUser(identityUser.Id, email, displayName));
             await db.SaveChangesAsync(cancellationToken);
         }
+
+        return identityUser;
     }
 
     private async Task SeedLeagueDataAsync(CancellationToken cancellationToken)
@@ -158,6 +175,45 @@ public sealed class DevelopmentDataSeeder(
             new Standing(competition.Id, teams[3].Id, played: 1, won: 0, drawn: 1, lost: 0, goalsFor: 0, goalsAgainst: 0, points: 1),
             new Standing(competition.Id, teams[2].Id, played: 1, won: 0, drawn: 1, lost: 0, goalsFor: 0, goalsAgainst: 0, points: 1),
             new Standing(competition.Id, teams[1].Id, played: 1, won: 0, drawn: 0, lost: 1, goalsFor: 1, goalsAgainst: 2, points: 0));
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task SeedCollaborationUsersAsync(CancellationToken cancellationToken)
+    {
+        await CreateIdentityUserAsync(
+            seedOptions.ModeratorEmail,
+            seedOptions.ModeratorPassword,
+            seedOptions.ModeratorDisplayName,
+            AppRoles.Moderator,
+            cancellationToken);
+
+        var contributor = await CreateIdentityUserAsync(
+            seedOptions.ContributorEmail,
+            seedOptions.ContributorPassword,
+            seedOptions.ContributorDisplayName,
+            AppRoles.Contributor,
+            cancellationToken);
+
+        var assignedTeams = await db.Teams
+            .AsNoTracking()
+            .Include(x => x.Club)
+            .OrderBy(x => x.Name)
+            .Take(2)
+            .Select(x => new { x.Id, x.ClubId })
+            .ToListAsync(cancellationToken);
+
+        foreach (var team in assignedTeams)
+        {
+            var alreadyAssigned = await db.ClubContributors.AnyAsync(
+                x => x.UserId == contributor.Id && x.TeamId == team.Id,
+                cancellationToken);
+
+            if (!alreadyAssigned)
+            {
+                db.ClubContributors.Add(new ClubContributor(team.ClubId, team.Id, contributor.Id));
+            }
+        }
 
         await db.SaveChangesAsync(cancellationToken);
     }

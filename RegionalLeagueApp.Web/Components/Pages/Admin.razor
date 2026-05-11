@@ -1,13 +1,17 @@
 @page "/admin"
 @rendermode InteractiveServer
-@attribute [Authorize(Policy = "RequireModerator")]
+@attribute [Authorize(Policy = "RequireContributor")]
 @using System.ComponentModel.DataAnnotations
+@using System.Text.Json
 @using Microsoft.AspNetCore.SignalR
 @using Microsoft.EntityFrameworkCore
-@using RegionalLeagueApp.Application.Standings
+@using RegionalLeagueApp.Application.Collaboration
+@using RegionalLeagueApp.Application.Matches
+@using RegionalLeagueApp.Domain.Collaboration
 @using RegionalLeagueApp.Web.Hubs
 @inject ApplicationDbContext Db
-@inject IStandingsRecalculationService StandingsRecalculationService
+@inject IMatchAdministrationPermissionService PermissionService
+@inject IMatchScoreRecalculationService MatchScoreRecalculationService
 @inject IHubContext<MatchUpdatesHub> MatchUpdates
 @inject ILogger<Admin> Logger
 
@@ -18,8 +22,23 @@
         <p class="eyebrow">Administracion</p>
         <h1>Gestion de partidos</h1>
     </div>
-    <span class="admin-badge">Admin / Moderator</span>
+    <span class="admin-badge">@access.RoleLabel</span>
 </div>
+
+<section class="panel admin-permissions">
+    <div>
+        <p class="eyebrow">Permisos actuales</p>
+        <h2>@PermissionSummary</h2>
+    </div>
+    @if (access.IsContributor && !access.CanManageAllMatches)
+    {
+        <span>@access.AssignedTeamIds.Count equipo(s) asignado(s)</span>
+    }
+    else if (access.CanModerate)
+    {
+        <span>Puede moderar todos los partidos y eventos</span>
+    }
+</section>
 
 @if (!string.IsNullOrWhiteSpace(successMessage))
 {
@@ -29,6 +48,43 @@
 @if (!string.IsNullOrWhiteSpace(errorMessage))
 {
     <div class="alert alert-danger admin-feedback" role="alert">@errorMessage</div>
+}
+
+@if (access.CanModerate)
+{
+    <section class="panel admin-proposals">
+        <div class="panel-title-row">
+            <div>
+                <p class="eyebrow">Moderacion</p>
+                <h2>Propuestas pendientes</h2>
+            </div>
+            <span>@pendingProposals.Count pendiente(s)</span>
+        </div>
+
+        @if (pendingProposals.Count == 0)
+        {
+            <EmptyState Text="No hay propuestas pendientes." />
+        }
+        else
+        {
+            <div class="admin-proposal-list">
+                @foreach (var proposal in pendingProposals)
+                {
+                    <article class="admin-proposal-row">
+                        <div>
+                            <strong>@proposal.MatchLabel</strong>
+                            <span>@proposal.Description</span>
+                            <small>@proposal.ProposedBy - @proposal.CreatedAt.LocalDateTime.ToString("dd/MM/yyyy HH:mm")</small>
+                        </div>
+                        <div class="admin-proposal-actions">
+                            <button type="button" class="admin-link-button" disabled="@isReviewingProposal" @onclick="async () => await ApproveProposalAsync(proposal.Id)">Aprobar</button>
+                            <button type="button" class="admin-link-button admin-link-button-muted" disabled="@isReviewingProposal" @onclick="async () => await RejectProposalAsync(proposal.Id)">Rechazar</button>
+                        </div>
+                    </article>
+                }
+            </div>
+        }
+    </section>
 }
 
 @if (matches.Count == 0)
@@ -159,16 +215,17 @@ else
                     <div class="score-edit-grid">
                         <div>
                             <label for="home-score">Goles local</label>
-                            <InputNumber id="home-score" class="form-control" min="0" @bind-Value="editing.HomeScore" />
+                            <InputNumber id="home-score" class="form-control" min="0" @bind-Value="editing.HomeScore" disabled />
                         </div>
                         <div>
                             <label for="away-score">Goles visitante</label>
-                            <InputNumber id="away-score" class="form-control" min="0" @bind-Value="editing.AwayScore" />
+                            <InputNumber id="away-score" class="form-control" min="0" @bind-Value="editing.AwayScore" disabled />
                         </div>
                     </div>
+                    <p class="admin-help-text">El marcador se calcula automaticamente desde los goles.</p>
 
                     <button class="btn btn-primary" type="submit" disabled="@isSaving">
-                        @(isSaving ? "Guardando..." : "Guardar cambios")
+                        @(isSaving ? "Guardando..." : access.CanModerate ? "Guardar cambios" : "Enviar propuesta")
                     </button>
                 </EditForm>
 
@@ -194,7 +251,7 @@ else
                                     <strong>@item.Minute'</strong>
                                     <span>@EventLabel(item.EventType)</span>
                                     <small>@item.TeamName - @item.PlayerName</small>
-                                    <button type="button" class="admin-link-button" @onclick="async () => await DeleteEventAsync(item.Id)">Eliminar</button>
+                                    <button type="button" class="admin-link-button" @onclick="async () => await DeleteEventAsync(item.Id)">@(access.CanModerate ? "Eliminar" : "Proponer eliminar")</button>
                                 </div>
                             }
                         </div>
@@ -236,7 +293,7 @@ else
                         </div>
 
                         <button class="btn btn-primary" type="submit" disabled="@isSavingEvent">
-                            @(isSavingEvent ? "Agregando..." : "Agregar evento")
+                            @(isSavingEvent ? "Agregando..." : access.CanModerate ? "Agregar evento" : "Proponer evento")
                         </button>
                     </EditForm>
                 </div>
@@ -246,12 +303,18 @@ else
 }
 
 @code {
+    [SupplyParameterFromQuery(Name = "matchId")]
+    public Guid? RequestedMatchId { get; set; }
+
     private readonly List<AdminMatchRow> matches = [];
     private MatchEditModel? editing;
     private EventCreateModel eventForm = new();
     private readonly List<AdminMatchEventRow> selectedEvents = [];
+    private readonly List<PendingProposalRow> pendingProposals = [];
+    private MatchAdministrationAccess access = MatchAdministrationAccess.Empty;
     private bool isSaving;
     private bool isSavingEvent;
+    private bool isReviewingProposal;
     private string? successMessage;
     private string? errorMessage;
     private string statusFilter = string.Empty;
@@ -263,6 +326,13 @@ else
         MatchEventType.YellowCard,
         MatchEventType.RedCard
     ];
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    private string PermissionSummary => access.CanManageAllMatches
+        ? "Puede editar cualquier partido y moderar eventos."
+        : access.IsContributor
+            ? "Puede enviar propuestas de resultados y eventos en partidos asignados."
+            : "No tiene permisos para administrar partidos.";
 
     private List<AdminMatchRow> FilteredMatches => matches
         .Where(match => string.IsNullOrWhiteSpace(statusFilter) || match.Status.ToString() == statusFilter)
@@ -284,7 +354,14 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        access = await PermissionService.GetAccessAsync();
         await LoadMatchesAsync();
+        await LoadPendingProposalsAsync();
+
+        if (RequestedMatchId is { } matchId)
+        {
+            await SelectMatchAsync(matchId);
+        }
     }
 
     private async Task LoadMatchesAsync()
@@ -296,6 +373,7 @@ else
             .Include(x => x.Round)
             .Include(x => x.HomeTeam)!.ThenInclude(x => x!.Club)
             .Include(x => x.AwayTeam)!.ThenInclude(x => x!.Club)
+            .Where(x => access.CanManageAllMatches || access.AssignedTeamIds.Contains(x.HomeTeamId) || access.AssignedTeamIds.Contains(x.AwayTeamId))
             .OrderByDescending(x => x.StartsAt)
             .Select(x => new AdminMatchRow(
                 x.Id,
@@ -312,16 +390,54 @@ else
             .ToListAsync());
     }
 
+    private async Task LoadPendingProposalsAsync()
+    {
+        pendingProposals.Clear();
+
+        if (!access.CanModerate)
+        {
+            return;
+        }
+
+        var proposals = await Db.MatchUpdateProposals
+            .AsNoTracking()
+            .Include(x => x.ProposedByUser)
+            .Include(x => x.Match)!.ThenInclude(x => x!.HomeTeam)!.ThenInclude(x => x!.Club)
+            .Include(x => x.Match)!.ThenInclude(x => x!.AwayTeam)!.ThenInclude(x => x!.Club)
+            .Where(x => x.Status == ProposalStatus.Pending)
+            .OrderBy(x => x.CreatedAt)
+            .Select(x => new
+            {
+                x.Id,
+                x.ChangeType,
+                x.PayloadJson,
+                x.ProposedStatus,
+                x.CreatedAt,
+                ProposedBy = x.ProposedByUser != null ? x.ProposedByUser.DisplayName : "Usuario",
+                HomeTeamName = x.Match != null && x.Match.HomeTeam != null ? x.Match.HomeTeam.Club!.Name : "Local",
+                AwayTeamName = x.Match != null && x.Match.AwayTeam != null ? x.Match.AwayTeam.Club!.Name : "Visitante"
+            })
+            .ToListAsync();
+
+        pendingProposals.AddRange(proposals.Select(x => new PendingProposalRow(
+            x.Id,
+            $"{x.HomeTeamName} vs {x.AwayTeamName}",
+            x.ProposedBy,
+            x.CreatedAt,
+            ProposalDescription(x.ChangeType, x.PayloadJson, x.ProposedStatus))));
+    }
+
     private async Task SelectMatchAsync(Guid matchId)
     {
         successMessage = null;
         errorMessage = null;
 
         var match = matches.FirstOrDefault(x => x.Id == matchId);
-        if (match is null)
+        if (match is null || !access.CanManageMatch(match.HomeTeamId, match.AwayTeamId))
         {
             editing = null;
             selectedEvents.Clear();
+            errorMessage = "No tenes permisos para editar este partido.";
             return;
         }
 
@@ -380,13 +496,38 @@ else
                 return;
             }
 
-            Db.Entry(match).Property(x => x.Status).CurrentValue = editing.Status;
-            Db.Entry(match).Property(x => x.HomeScore).CurrentValue = editing.HomeScore;
-            Db.Entry(match).Property(x => x.AwayScore).CurrentValue = editing.AwayScore;
+            if (!access.CanManageMatch(match.HomeTeamId, match.AwayTeamId))
+            {
+                errorMessage = "No tenes permisos para guardar cambios en este partido.";
+                return;
+            }
 
-            var competitionId = match.CompetitionId;
+            if (!access.CanModerate)
+            {
+                if (access.UserId is not { } userId)
+                {
+                    errorMessage = "No se pudo identificar el usuario actual.";
+                    return;
+                }
+
+                var payload = new MatchStatusAndResultProposalPayload(editing.Status);
+                Db.MatchUpdateProposals.Add(MatchUpdateProposal.ForMatchStatusAndResult(
+                    editing.MatchId,
+                    userId,
+                    editing.Status,
+                    null,
+                    null,
+                    ToJson(payload)));
+
+                await Db.SaveChangesAsync();
+                await LoadPendingProposalsAsync();
+                successMessage = "Propuesta enviada para revision.";
+                return;
+            }
+
+            Db.Entry(match).Property(x => x.Status).CurrentValue = editing.Status;
             await Db.SaveChangesAsync();
-            await StandingsRecalculationService.RecalculateCompetitionAsync(competitionId);
+            await MatchScoreRecalculationService.RecalculateMatchScoreAndStandingsAsync(match.Id);
             var selectedMatchId = editing.MatchId;
             await LoadMatchesAsync();
             await SelectMatchAsync(selectedMatchId);
@@ -437,9 +578,43 @@ else
             return;
         }
 
+        if (!access.CanManageMatch(editing.HomeTeamId, editing.AwayTeamId))
+        {
+            errorMessage = "No tenes permisos para agregar eventos en este partido.";
+            return;
+        }
+
         isSavingEvent = true;
         try
         {
+            if (!access.CanModerate)
+            {
+                if (access.UserId is not { } userId)
+                {
+                    errorMessage = "No se pudo identificar el usuario actual.";
+                    return;
+                }
+
+                var payload = new MatchEventAddProposalPayload(
+                    eventForm.EventType,
+                    eventForm.Minute,
+                    eventForm.TeamId,
+                    eventForm.PlayerName.Trim());
+
+                Db.MatchUpdateProposals.Add(MatchUpdateProposal.ForMatchEvent(
+                    editing.MatchId,
+                    userId,
+                    ProposalChangeType.MatchEventAdd,
+                    ToJson(payload)));
+
+                await Db.SaveChangesAsync();
+                eventForm.PlayerName = string.Empty;
+                eventForm.Minute = 0;
+                await LoadPendingProposalsAsync();
+                successMessage = "Propuesta enviada para revision.";
+                return;
+            }
+
             Db.MatchEvents.Add(new MatchEvent(
                 editing.MatchId,
                 eventForm.EventType,
@@ -448,9 +623,17 @@ else
                 playerName: eventForm.PlayerName));
 
             await Db.SaveChangesAsync();
+            if (eventForm.EventType == MatchEventType.Goal)
+            {
+                await MatchScoreRecalculationService.RecalculateMatchScoreAndStandingsAsync(editing.MatchId);
+            }
+
             await LoadSelectedEventsAsync(editing.MatchId);
+            var selectedMatchId = editing.MatchId;
             eventForm.PlayerName = string.Empty;
             eventForm.Minute = 0;
+            await LoadMatchesAsync();
+            await SelectMatchAsync(selectedMatchId);
             await NotifyMatchDataChangedAsync();
             successMessage = "Evento agregado correctamente.";
         }
@@ -474,6 +657,12 @@ else
         successMessage = null;
         errorMessage = null;
 
+        if (!access.CanManageMatch(editing.HomeTeamId, editing.AwayTeamId))
+        {
+            errorMessage = "No tenes permisos para eliminar eventos de este partido.";
+            return;
+        }
+
         var matchEvent = await Db.MatchEvents.FirstOrDefaultAsync(x => x.Id == eventId && x.MatchId == editing.MatchId);
         if (matchEvent is null)
         {
@@ -481,8 +670,44 @@ else
             return;
         }
 
+        if (!access.CanModerate)
+        {
+            if (access.UserId is not { } userId)
+            {
+                errorMessage = "No se pudo identificar el usuario actual.";
+                return;
+            }
+
+            var payload = new MatchEventDeleteProposalPayload(
+                matchEvent.Id,
+                matchEvent.Type,
+                matchEvent.Minute,
+                matchEvent.TeamId,
+                !string.IsNullOrWhiteSpace(matchEvent.PlayerName) ? matchEvent.PlayerName : "Sin jugador");
+
+            Db.MatchUpdateProposals.Add(MatchUpdateProposal.ForMatchEvent(
+                editing.MatchId,
+                userId,
+                ProposalChangeType.MatchEventDelete,
+                ToJson(payload)));
+
+            await Db.SaveChangesAsync();
+            await LoadPendingProposalsAsync();
+            successMessage = "Propuesta enviada para revision.";
+            return;
+        }
+
+        var deletedEventType = matchEvent.Type;
         Db.MatchEvents.Remove(matchEvent);
         await Db.SaveChangesAsync();
+        if (deletedEventType == MatchEventType.Goal)
+        {
+            await MatchScoreRecalculationService.RecalculateMatchScoreAndStandingsAsync(editing.MatchId);
+        }
+
+        var selectedMatchId = editing.MatchId;
+        await LoadMatchesAsync();
+        await SelectMatchAsync(selectedMatchId);
         await LoadSelectedEventsAsync(editing.MatchId);
         await NotifyMatchDataChangedAsync();
         successMessage = "Evento eliminado correctamente.";
@@ -494,18 +719,152 @@ else
         Logger.LogInformation("SignalR notification {EventName} emitted.", MatchUpdatesHub.MatchDataChanged);
     }
 
+    private async Task ApproveProposalAsync(Guid proposalId)
+    {
+        if (!access.CanModerate || isReviewingProposal)
+        {
+            return;
+        }
+
+        if (access.UserId is not { } reviewerId)
+        {
+            errorMessage = "No se pudo identificar el usuario moderador.";
+            return;
+        }
+
+        successMessage = null;
+        errorMessage = null;
+        isReviewingProposal = true;
+
+        try
+        {
+            var proposal = await Db.MatchUpdateProposals
+                .Include(x => x.Match)
+                .FirstOrDefaultAsync(x => x.Id == proposalId && x.Status == ProposalStatus.Pending);
+
+            if (proposal is null)
+            {
+                errorMessage = "La propuesta ya no esta pendiente.";
+                return;
+            }
+
+            var shouldRecalculateScoreAndStandings = await ApplyProposalAsync(proposal);
+            proposal.Approve(reviewerId);
+            await Db.SaveChangesAsync();
+
+            if (shouldRecalculateScoreAndStandings)
+            {
+                await MatchScoreRecalculationService.RecalculateMatchScoreAndStandingsAsync(proposal.MatchId);
+            }
+
+            await LoadMatchesAsync();
+            if (editing is not null)
+            {
+                await SelectMatchAsync(editing.MatchId);
+            }
+
+            await LoadPendingProposalsAsync();
+            await NotifyMatchDataChangedAsync();
+            successMessage = "Propuesta aprobada y aplicada correctamente.";
+        }
+        catch (Exception)
+        {
+            errorMessage = "No se pudo aprobar la propuesta. Revisa los datos e intenta nuevamente.";
+        }
+        finally
+        {
+            isReviewingProposal = false;
+        }
+    }
+
+    private async Task RejectProposalAsync(Guid proposalId)
+    {
+        if (!access.CanModerate || isReviewingProposal)
+        {
+            return;
+        }
+
+        if (access.UserId is not { } reviewerId)
+        {
+            errorMessage = "No se pudo identificar el usuario moderador.";
+            return;
+        }
+
+        successMessage = null;
+        errorMessage = null;
+        isReviewingProposal = true;
+
+        try
+        {
+            var proposal = await Db.MatchUpdateProposals
+                .FirstOrDefaultAsync(x => x.Id == proposalId && x.Status == ProposalStatus.Pending);
+
+            if (proposal is null)
+            {
+                errorMessage = "La propuesta ya no esta pendiente.";
+                return;
+            }
+
+            var shouldRecalculateScoreAndStandings = proposal.ChangeType == ProposalChangeType.MatchEventDelete
+                && FromJson<MatchEventDeleteProposalPayload>(proposal.PayloadJson).EventType == MatchEventType.Goal;
+
+            proposal.Reject(reviewerId);
+            await Db.SaveChangesAsync();
+            if (shouldRecalculateScoreAndStandings)
+            {
+                await MatchScoreRecalculationService.RecalculateMatchScoreAndStandingsAsync(proposal.MatchId);
+                await NotifyMatchDataChangedAsync();
+            }
+
+            await LoadPendingProposalsAsync();
+            successMessage = "Propuesta rechazada.";
+        }
+        finally
+        {
+            isReviewingProposal = false;
+        }
+    }
+
+    private async Task<bool> ApplyProposalAsync(MatchUpdateProposal proposal)
+    {
+        if (proposal.Match is null)
+        {
+            throw new InvalidOperationException("La propuesta no tiene partido asociado.");
+        }
+
+        switch (proposal.ChangeType)
+        {
+            case ProposalChangeType.MatchStatusAndResult:
+                Db.Entry(proposal.Match).Property(x => x.Status).CurrentValue = proposal.ProposedStatus ?? proposal.Match.Status;
+                return true;
+
+            case ProposalChangeType.MatchEventAdd:
+                var addPayload = FromJson<MatchEventAddProposalPayload>(proposal.PayloadJson);
+                Db.MatchEvents.Add(new MatchEvent(
+                    proposal.MatchId,
+                    addPayload.EventType,
+                    addPayload.Minute,
+                    addPayload.TeamId,
+                    playerName: addPayload.PlayerName));
+                return addPayload.EventType == MatchEventType.Goal;
+
+            case ProposalChangeType.MatchEventDelete:
+                var deletePayload = FromJson<MatchEventDeleteProposalPayload>(proposal.PayloadJson);
+                var matchEvent = await Db.MatchEvents.FirstOrDefaultAsync(x => x.Id == deletePayload.EventId && x.MatchId == proposal.MatchId);
+                if (matchEvent is not null)
+                {
+                    Db.MatchEvents.Remove(matchEvent);
+                }
+
+                return deletePayload.EventType == MatchEventType.Goal;
+
+            default:
+                throw new InvalidOperationException("Tipo de propuesta no soportado.");
+        }
+    }
+
     private static string? Validate(MatchEditModel model)
     {
-        if (model.HomeScore < 0 || model.AwayScore < 0)
-        {
-            return "Los goles no pueden ser negativos.";
-        }
-
-        if (model.Status == MatchStatus.Finished && (model.HomeScore is null || model.AwayScore is null))
-        {
-            return "Un partido finalizado debe tener goles local y visitante cargados.";
-        }
-
         return null;
     }
 
@@ -549,6 +908,39 @@ else
         _ => eventType.ToString()
     };
 
+    private static string ToJson<T>(T value) => JsonSerializer.Serialize(value, JsonOptions);
+
+    private static T FromJson<T>(string json) =>
+        JsonSerializer.Deserialize<T>(json, JsonOptions)
+        ?? throw new InvalidOperationException("Payload de propuesta invalido.");
+
+    private static string ProposalDescription(
+        ProposalChangeType changeType,
+        string payloadJson,
+        MatchStatus? proposedStatus)
+    {
+        return changeType switch
+        {
+            ProposalChangeType.MatchStatusAndResult =>
+                $"Cambiar estado a {proposedStatus}. El marcador se calcula desde goles.",
+            ProposalChangeType.MatchEventAdd => EventAddDescription(payloadJson),
+            ProposalChangeType.MatchEventDelete => EventDeleteDescription(payloadJson),
+            _ => changeType.ToString()
+        };
+    }
+
+    private static string EventAddDescription(string payloadJson)
+    {
+        var payload = FromJson<MatchEventAddProposalPayload>(payloadJson);
+        return $"Agregar {EventLabel(payload.EventType)} - {payload.PlayerName} ({payload.Minute}')";
+    }
+
+    private static string EventDeleteDescription(string payloadJson)
+    {
+        var payload = FromJson<MatchEventDeleteProposalPayload>(payloadJson);
+        return $"Eliminar {EventLabel(payload.EventType)} - {payload.PlayerName} ({payload.Minute}')";
+    }
+
     private sealed record AdminMatchRow(
         Guid Id,
         string CompetitionName,
@@ -587,6 +979,13 @@ else
         int Minute,
         string TeamName,
         string PlayerName);
+
+    private sealed record PendingProposalRow(
+        Guid Id,
+        string MatchLabel,
+        string ProposedBy,
+        DateTimeOffset CreatedAt,
+        string Description);
 
     private sealed class EventCreateModel
     {

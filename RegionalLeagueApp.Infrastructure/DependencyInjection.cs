@@ -3,8 +3,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using RegionalLeagueApp.Application.Abstractions.Data;
+using RegionalLeagueApp.Application.Collaboration;
+using RegionalLeagueApp.Infrastructure.Collaboration;
+using RegionalLeagueApp.Application.Matches;
 using RegionalLeagueApp.Application.Standings;
 using RegionalLeagueApp.Infrastructure.Identity;
+using RegionalLeagueApp.Infrastructure.Matches;
 using RegionalLeagueApp.Infrastructure.Persistence;
 using RegionalLeagueApp.Infrastructure.Seed;
 using RegionalLeagueApp.Infrastructure.Standings;
@@ -40,6 +44,8 @@ public static class DependencyInjection
 
         services.AddScoped<IApplicationDbContext>(provider =>
             provider.GetRequiredService<ApplicationDbContext>());
+        services.AddScoped<IMatchAdministrationPermissionService, EfMatchAdministrationPermissionService>();
+        services.AddScoped<IMatchScoreRecalculationService, EfMatchScoreRecalculationService>();
         services.AddScoped<IStandingsQueryService, EfStandingsQueryService>();
         services.AddScoped<IStandingsRecalculationService, EfStandingsRecalculationService>();
         services.Configure<DevelopmentSeedOptions>(options =>
@@ -49,6 +55,12 @@ public static class DependencyInjection
             options.AdminEmail = section["AdminEmail"] ?? options.AdminEmail;
             options.AdminDisplayName = section["AdminDisplayName"] ?? options.AdminDisplayName;
             options.AdminPassword = section["AdminPassword"] ?? options.AdminPassword;
+            options.ModeratorEmail = section["ModeratorEmail"] ?? options.ModeratorEmail;
+            options.ModeratorDisplayName = section["ModeratorDisplayName"] ?? options.ModeratorDisplayName;
+            options.ModeratorPassword = section["ModeratorPassword"] ?? options.ModeratorPassword;
+            options.ContributorEmail = section["ContributorEmail"] ?? options.ContributorEmail;
+            options.ContributorDisplayName = section["ContributorDisplayName"] ?? options.ContributorDisplayName;
+            options.ContributorPassword = section["ContributorPassword"] ?? options.ContributorPassword;
         });
         services.AddScoped<DevelopmentDataSeeder>();
 

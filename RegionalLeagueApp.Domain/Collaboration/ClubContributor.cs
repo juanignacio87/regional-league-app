@@ -8,6 +8,8 @@ public sealed class ClubContributor : Entity
 {
     public Guid ClubId { get; private set; }
     public Club? Club { get; private set; }
+    public Guid? TeamId { get; private set; }
+    public Team? Team { get; private set; }
     public Guid UserId { get; private set; }
     public AppUser? User { get; private set; }
     public bool CanReportMatches { get; private set; } = true;
@@ -23,5 +25,11 @@ public sealed class ClubContributor : Entity
         ClubId = clubId;
         UserId = userId;
         CanReportMatches = canReportMatches;
+    }
+
+    public ClubContributor(Guid clubId, Guid teamId, Guid userId, bool canReportMatches = true)
+        : this(clubId, userId, canReportMatches)
+    {
+        TeamId = teamId;
     }
 }

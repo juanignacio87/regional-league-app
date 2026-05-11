@@ -2,7 +2,9 @@
 @rendermode InteractiveServer
 @implements IDisposable
 @using Microsoft.EntityFrameworkCore
+@using RegionalLeagueApp.Application.Collaboration
 @inject ApplicationDbContext Db
+@inject IMatchAdministrationPermissionService PermissionService
 @inject MatchUpdatesClient MatchUpdatesClient
 
 <PageTitle>Partido</PageTitle>
@@ -13,55 +15,120 @@
 }
 else
 {
-    <section class="match-hero">
-        <div>
-            <small>@match.Round?.Name</small>
-            <h1>@match.HomeTeam?.Club?.Name</h1>
+    <section class="match-center-hero">
+        <div class="match-center-topbar">
+            <div class="match-center-meta">
+                <span>@LeagueName(match)</span>
+                <span>@match.Competition?.Name</span>
+                <span>@match.StartsAt.LocalDateTime.ToString("dd/MM/yyyy HH:mm")</span>
+            </div>
+
+            @if (CanEditMatch)
+            {
+                <a class="match-center-edit" href="@EditMatchUrl">Editar partido</a>
+            }
         </div>
-        <strong>@ScoreText(match)</strong>
-        <div>
-            <small>@match.Status</small>
-            <h1>@match.AwayTeam?.Club?.Name</h1>
+
+        <div class="match-center-scoreboard">
+            <div class="match-center-team">
+                <div class="match-center-crest">@Initials(HomeClubName(match))</div>
+                <h1>@HomeClubName(match)</h1>
+                <small>Local</small>
+            </div>
+
+            <div class="match-center-score">
+                <span class="match-center-status @StatusClass(match.Status)">@StatusLabel(match.Status)</span>
+                <strong>@ScoreText(match)</strong>
+                <small>@(match.Round?.Name ?? "Sin fecha")</small>
+            </div>
+
+            <div class="match-center-team match-center-team--away">
+                <div class="match-center-crest">@Initials(AwayClubName(match))</div>
+                <h1>@AwayClubName(match)</h1>
+                <small>Visitante</small>
+            </div>
         </div>
     </section>
 
-    <section class="content-grid two-col">
-        <article class="panel">
-            <h2>Datos del partido</h2>
-            <dl class="detail-list">
-                <div><dt>Fecha</dt><dd>@match.StartsAt.LocalDateTime.ToString("dd/MM/yyyy HH:mm")</dd></div>
-                <div><dt>Sede</dt><dd>@match.Venue?.Name, @match.Venue?.City</dd></div>
-                <div><dt>Competencia</dt><dd>@match.Competition?.Name</dd></div>
-                <div><dt>Estado</dt><dd>@match.Status</dd></div>
-            </dl>
-        </article>
+    <section class="match-center-grid">
+        <article class="panel match-center-timeline">
+            <div class="panel-title">
+                <h2>Timeline</h2>
+                <span class="match-center-total">@TimelineEvents.Count eventos</span>
+            </div>
 
-        <article class="panel">
-            <h2>Linea de tiempo</h2>
-            @if (match.Events.Count == 0)
+            @if (TimelineEvents.Count == 0)
             {
                 <EmptyState Text="No hay eventos cargados para este partido." />
             }
             else
             {
-                <div class="timeline">
-                    @foreach (var item in match.Events.OrderBy(x => x.Minute))
+                <div class="match-timeline">
+                    @foreach (var item in TimelineEvents)
                     {
-                        <div class="timeline-item">
-                            <strong>@item.Minute'</strong>
-                            <span>@EventLabel(item)</span>
-                            <small>@item.Team?.Club?.ShortName @PlayerText(item) @item.Notes</small>
+                        <div class="match-timeline-event @(IsHomeEvent(item) ? "match-timeline-event--home" : "match-timeline-event--away")">
+                            <div class="match-timeline-body">
+                                <strong>@EventLabel(item.Type)</strong>
+                                <small>@PlayerText(item)</small>
+                            </div>
+                            <span class="match-timeline-minute">@item.Minute'</span>
+                            <span class="match-timeline-icon @EventIconClass(item.Type)">@EventIconText(item.Type)</span>
+                            <span class="match-timeline-team">@TeamShortName(item)</span>
                         </div>
                     }
                 </div>
             }
         </article>
+
+        <aside class="match-center-side">
+            <article class="panel">
+                <h2>Estadisticas</h2>
+                <div class="match-stats">
+                    <div class="match-stat-header">
+                        <strong>@ShortHomeName(match)</strong>
+                        <span></span>
+                        <strong>@ShortAwayName(match)</strong>
+                    </div>
+                    <div class="match-stat-row">
+                        <strong>@EventCount(match.HomeTeamId, MatchEventType.Goal)</strong>
+                        <span>Goles</span>
+                        <strong>@EventCount(match.AwayTeamId, MatchEventType.Goal)</strong>
+                    </div>
+                    <div class="match-stat-row">
+                        <strong>@EventCount(match.HomeTeamId, MatchEventType.YellowCard)</strong>
+                        <span>Amarillas</span>
+                        <strong>@EventCount(match.AwayTeamId, MatchEventType.YellowCard)</strong>
+                    </div>
+                    <div class="match-stat-row">
+                        <strong>@EventCount(match.HomeTeamId, MatchEventType.RedCard)</strong>
+                        <span>Rojas</span>
+                        <strong>@EventCount(match.AwayTeamId, MatchEventType.RedCard)</strong>
+                    </div>
+                    <div class="match-stat-row match-stat-row--total">
+                        <strong>@TeamEventCount(match.HomeTeamId)</strong>
+                        <span>Total eventos</span>
+                        <strong>@TeamEventCount(match.AwayTeamId)</strong>
+                    </div>
+                </div>
+            </article>
+
+            <article class="panel">
+                <h2>Datos del partido</h2>
+                <dl class="detail-list">
+                    <div><dt>Fecha</dt><dd>@match.StartsAt.LocalDateTime.ToString("dd/MM/yyyy HH:mm")</dd></div>
+                    <div><dt>Sede</dt><dd>@VenueText(match)</dd></div>
+                    <div><dt>Competencia</dt><dd>@match.Competition?.Name</dd></div>
+                    <div><dt>Estado</dt><dd>@StatusLabel(match.Status)</dd></div>
+                </dl>
+            </article>
+        </aside>
     </section>
 }
 
 @code {
     [Parameter] public Guid Id { get; set; }
     private Match? match;
+    private MatchAdministrationAccess access = MatchAdministrationAccess.Empty;
     private Func<Task>? reloadHandler;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -82,6 +149,7 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
+        access = await PermissionService.GetAccessAsync();
         await LoadAsync();
     }
 
@@ -97,7 +165,7 @@ else
     {
         match = await Db.Matches
             .AsNoTracking()
-            .Include(x => x.Competition)
+            .Include(x => x.Competition)!.ThenInclude(x => x!.Season)!.ThenInclude(x => x!.League)
             .Include(x => x.Round)
             .Include(x => x.Venue)
             .Include(x => x.HomeTeam)!.ThenInclude(x => x!.Club)
@@ -107,27 +175,94 @@ else
             .FirstOrDefaultAsync(x => x.Id == Id);
     }
 
+    private IReadOnlyList<MatchEvent> TimelineEvents => match?.Events
+        .OrderBy(x => x.Minute)
+        .ThenBy(x => x.CreatedAt)
+        .ToList() ?? [];
+
+    private bool CanEditMatch => match is not null && access.CanManageMatch(match.HomeTeamId, match.AwayTeamId);
+
+    private string EditMatchUrl => $"/admin?matchId={Id}";
+
     private static string ScoreText(Match item) =>
         item.HomeScore is null || item.AwayScore is null ? "vs" : $"{item.HomeScore}-{item.AwayScore}";
 
-    private static string EventLabel(MatchEvent item) => item.Type switch
+    private static string EventIconText(MatchEventType eventType) => eventType switch
     {
-        MatchEventType.Goal => "Gol",
-        MatchEventType.OwnGoal => "Gol en contra",
-        MatchEventType.PenaltyScored => "Penal convertido",
-        MatchEventType.PenaltyMissed => "Penal errado",
-        MatchEventType.YellowCard => "Tarjeta amarilla",
-        MatchEventType.RedCard => "Tarjeta roja",
-        MatchEventType.KickOff => "Inicio",
-        MatchEventType.HalfTime => "Entretiempo",
-        MatchEventType.SecondHalfStart => "Segundo tiempo",
-        MatchEventType.FullTime => "Final",
-        MatchEventType.Substitution => "Cambio",
-        _ => item.Type.ToString()
+        MatchEventType.Goal => "G",
+        MatchEventType.YellowCard => "Y",
+        MatchEventType.RedCard => "R",
+        _ => "-"
+    };
+
+    private static string EventIconClass(MatchEventType eventType) => eventType switch
+    {
+        MatchEventType.Goal => "match-timeline-icon--goal",
+        MatchEventType.YellowCard => "match-timeline-icon--yellow",
+        MatchEventType.RedCard => "match-timeline-icon--red",
+        _ => string.Empty
+    };
+
+    private static string EventLabel(MatchEventType eventType) => eventType switch
+    {
+        MatchEventType.Goal => "Goal",
+        MatchEventType.YellowCard => "Yellow card",
+        MatchEventType.RedCard => "Red card",
+        _ => eventType.ToString()
     };
 
     private static string PlayerText(MatchEvent item) =>
         !string.IsNullOrWhiteSpace(item.PlayerName)
             ? item.PlayerName
             : item.Player?.FullName ?? string.Empty;
+
+    private static string HomeClubName(Match item) => item.HomeTeam?.Club?.Name ?? "Local";
+
+    private static string AwayClubName(Match item) => item.AwayTeam?.Club?.Name ?? "Visitante";
+
+    private static string ShortHomeName(Match item) => item.HomeTeam?.Club?.ShortName ?? "LOC";
+
+    private static string ShortAwayName(Match item) => item.AwayTeam?.Club?.ShortName ?? "VIS";
+
+    private static string LeagueName(Match item) => item.Competition?.Season?.League?.Name ?? "Liga Regional";
+
+    private static string VenueText(Match item) =>
+        item.Venue is null ? "Sede a confirmar" : $"{item.Venue.Name}, {item.Venue.City}";
+
+    private static string StatusLabel(MatchStatus status) => status switch
+    {
+        MatchStatus.Scheduled => "Scheduled",
+        MatchStatus.Live or MatchStatus.HalfTime => "Live",
+        MatchStatus.Finished => "Finished",
+        _ => status.ToString()
+    };
+
+    private static string StatusClass(MatchStatus status) => status switch
+    {
+        MatchStatus.Live or MatchStatus.HalfTime => "match-center-status--live",
+        MatchStatus.Finished => "match-center-status--finished",
+        _ => "match-center-status--scheduled"
+    };
+
+    private static string Initials(string name)
+    {
+        var parts = name
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Take(2)
+            .Select(part => part[0]);
+
+        var initials = string.Concat(parts);
+        return string.IsNullOrWhiteSpace(initials) ? "FC" : initials.ToUpperInvariant();
+    }
+
+    private bool IsHomeEvent(MatchEvent item) => match?.HomeTeamId == item.TeamId;
+
+    private string TeamShortName(MatchEvent item) => item.Team?.Club?.ShortName
+        ?? (IsHomeEvent(item) ? "Local" : "Visitante");
+
+    private int EventCount(Guid teamId, MatchEventType type) => match?.Events
+        .Count(x => x.TeamId == teamId && x.Type == type) ?? 0;
+
+    private int TeamEventCount(Guid teamId) => match?.Events
+        .Count(x => x.TeamId == teamId) ?? 0;
 }
