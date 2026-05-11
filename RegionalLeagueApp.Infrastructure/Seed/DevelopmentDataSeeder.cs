@@ -147,7 +147,8 @@ public sealed class DevelopmentDataSeeder(
         db.Venues.AddRange(venues);
         db.Clubs.AddRange(clubs);
         db.Teams.AddRange(teams);
-        db.Players.AddRange(CreatePlayers(teams));
+        var players = CreatePlayers(teams).ToArray();
+        db.Players.AddRange(players);
 
         var matches = new[]
         {
@@ -162,12 +163,12 @@ public sealed class DevelopmentDataSeeder(
         db.Matches.AddRange(matches);
         db.MatchEvents.AddRange(
             new MatchEvent(matches[0].Id, MatchEventType.KickOff, 0),
-            new MatchEvent(matches[0].Id, MatchEventType.Goal, 22, teams[0].Id, notes: "Opening goal"),
-            new MatchEvent(matches[0].Id, MatchEventType.Goal, 61, teams[1].Id, notes: "Equalizer"),
-            new MatchEvent(matches[0].Id, MatchEventType.Goal, 78, teams[0].Id, notes: "Winning goal"),
+            SeedEvent(matches[0].Id, MatchEventType.Goal, 22, teams[0].Id, players, "Opening goal"),
+            SeedEvent(matches[0].Id, MatchEventType.Goal, 61, teams[1].Id, players, "Equalizer"),
+            SeedEvent(matches[0].Id, MatchEventType.Goal, 78, teams[0].Id, players, "Winning goal"),
             new MatchEvent(matches[0].Id, MatchEventType.FullTime, 90),
             new MatchEvent(matches[1].Id, MatchEventType.KickOff, 0),
-            new MatchEvent(matches[1].Id, MatchEventType.YellowCard, 34, teams[2].Id),
+            SeedEvent(matches[1].Id, MatchEventType.YellowCard, 34, teams[2].Id, players),
             new MatchEvent(matches[1].Id, MatchEventType.FullTime, 90));
 
         db.Standings.AddRange(
@@ -229,6 +230,23 @@ public sealed class DevelopmentDataSeeder(
             yield return new Player(team.Id, "Lucas", suffix, PlayerPosition.Midfielder, 8);
             yield return new Player(team.Id, "Nicolas", suffix, PlayerPosition.Forward, 9);
         }
+    }
+
+    private static MatchEvent SeedEvent(
+        Guid matchId,
+        MatchEventType eventType,
+        int minute,
+        Guid teamId,
+        IReadOnlyCollection<Player> players,
+        string? notes = null)
+    {
+        var player = players
+            .Where(x => x.TeamId == teamId)
+            .OrderByDescending(x => x.Position == PlayerPosition.Forward)
+            .ThenBy(x => x.ShirtNumber ?? int.MaxValue)
+            .First();
+
+        return new MatchEvent(matchId, eventType, minute, teamId, player.Id, notes, player.DisplayName);
     }
 
     private static DateTimeOffset UtcDateTime(int year, int month, int day, int hour, int minute) =>

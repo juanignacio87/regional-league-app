@@ -272,7 +272,7 @@ else
                             </div>
                             <div>
                                 <label for="event-team">Equipo</label>
-                                <InputSelect id="event-team" class="form-control" @bind-Value="eventForm.TeamId">
+                                <InputSelect id="event-team" class="form-control" @bind-Value="eventForm.TeamId" @bind-Value:after="OnEventTeamChangedAsync">
                                     <option value="@editing.HomeTeamId">@editing.HomeTeamName</option>
                                     <option value="@editing.AwayTeamId">@editing.AwayTeamName</option>
                                 </InputSelect>
@@ -282,8 +282,21 @@ else
                         <div class="score-edit-grid">
                             <div>
                                 <label for="event-player">Jugador</label>
-                                <InputText id="event-player" class="form-control" @bind-Value="eventForm.PlayerName" />
-                                <ValidationMessage For="() => eventForm.PlayerName" />
+                                @if (eventPlayers.Count == 0)
+                                {
+                                    <p class="admin-empty-hint">No hay jugadores activos cargados para este equipo.</p>
+                                }
+                                else
+                                {
+                                    <InputSelect id="event-player" class="form-control" @bind-Value="eventForm.PlayerId" @bind-Value:after="OnEventPlayerChanged">
+                                        <option value="">Seleccionar jugador</option>
+                                        @foreach (var player in eventPlayers)
+                                        {
+                                            <option value="@player.Id">@player.Label</option>
+                                        }
+                                    </InputSelect>
+                                    <ValidationMessage For="() => eventForm.PlayerId" />
+                                }
                             </div>
                             <div>
                                 <label for="event-minute">Minuto</label>
@@ -310,6 +323,7 @@ else
     private MatchEditModel? editing;
     private EventCreateModel eventForm = new();
     private readonly List<AdminMatchEventRow> selectedEvents = [];
+    private readonly List<EventPlayerOption> eventPlayers = [];
     private readonly List<PendingProposalRow> pendingProposals = [];
     private MatchAdministrationAccess access = MatchAdministrationAccess.Empty;
     private bool isSaving;
@@ -463,6 +477,7 @@ else
         };
 
         await LoadSelectedEventsAsync(match.Id);
+        await LoadEventPlayersAsync(eventForm.TeamId);
     }
 
     private void ClearFilters()
@@ -470,6 +485,35 @@ else
         statusFilter = string.Empty;
         roundFilter = string.Empty;
         clubFilter = string.Empty;
+    }
+
+    private async Task OnEventTeamChangedAsync()
+    {
+        eventForm.PlayerId = null;
+        eventForm.PlayerName = string.Empty;
+        await LoadEventPlayersAsync(eventForm.TeamId);
+    }
+
+    private void OnEventPlayerChanged()
+    {
+        var selectedPlayer = eventPlayers.FirstOrDefault(x => x.Id == eventForm.PlayerId);
+        eventForm.PlayerName = selectedPlayer?.DisplayName ?? string.Empty;
+    }
+
+    private async Task LoadEventPlayersAsync(Guid teamId)
+    {
+        eventPlayers.Clear();
+        eventPlayers.AddRange(await Db.Players
+            .AsNoTracking()
+            .Where(x => x.TeamId == teamId && x.IsActive)
+            .OrderBy(x => x.ShirtNumber ?? int.MaxValue)
+            .ThenBy(x => x.DisplayName)
+            .Select(x => new EventPlayerOption(
+                x.Id,
+                x.DisplayName,
+                x.ShirtNumber,
+                x.ShirtNumber != null ? $"#{x.ShirtNumber} {x.DisplayName}" : x.DisplayName))
+            .ToListAsync());
     }
 
     private async Task SaveAsync()
@@ -560,7 +604,7 @@ else
                 x.Type,
                 x.Minute,
                 x.Team != null ? x.Team.Club!.ShortName : "Sin equipo",
-                x.PlayerName != string.Empty ? x.PlayerName : x.Player != null ? x.Player.FullName : "Sin jugador"))
+                x.PlayerName != string.Empty ? x.PlayerName : x.Player != null ? x.Player.DisplayName : "Sin jugador"))
             .ToListAsync());
     }
 
@@ -599,6 +643,7 @@ else
                     eventForm.EventType,
                     eventForm.Minute,
                     eventForm.TeamId,
+                    eventForm.PlayerId!.Value,
                     eventForm.PlayerName.Trim());
 
                 Db.MatchUpdateProposals.Add(MatchUpdateProposal.ForMatchEvent(
@@ -609,6 +654,7 @@ else
 
                 await Db.SaveChangesAsync();
                 eventForm.PlayerName = string.Empty;
+                eventForm.PlayerId = null;
                 eventForm.Minute = 0;
                 await LoadPendingProposalsAsync();
                 successMessage = "Propuesta enviada para revision.";
@@ -620,6 +666,7 @@ else
                 eventForm.EventType,
                 eventForm.Minute,
                 eventForm.TeamId,
+                eventForm.PlayerId,
                 playerName: eventForm.PlayerName));
 
             await Db.SaveChangesAsync();
@@ -631,6 +678,7 @@ else
             await LoadSelectedEventsAsync(editing.MatchId);
             var selectedMatchId = editing.MatchId;
             eventForm.PlayerName = string.Empty;
+            eventForm.PlayerId = null;
             eventForm.Minute = 0;
             await LoadMatchesAsync();
             await SelectMatchAsync(selectedMatchId);
@@ -845,6 +893,7 @@ else
                     addPayload.EventType,
                     addPayload.Minute,
                     addPayload.TeamId,
+                    addPayload.PlayerId,
                     playerName: addPayload.PlayerName));
                 return addPayload.EventType == MatchEventType.Goal;
 
@@ -870,9 +919,9 @@ else
 
     private static string? Validate(EventCreateModel model, MatchEditModel match)
     {
-        if (string.IsNullOrWhiteSpace(model.PlayerName))
+        if (model.PlayerId is null || string.IsNullOrWhiteSpace(model.PlayerName))
         {
-            return "El nombre del jugador es obligatorio.";
+            return "Selecciona un jugador del plantel.";
         }
 
         if (model.Minute is < 0 or > 130)
@@ -980,6 +1029,12 @@ else
         string TeamName,
         string PlayerName);
 
+    private sealed record EventPlayerOption(
+        Guid Id,
+        string DisplayName,
+        int? ShirtNumber,
+        string Label);
+
     private sealed record PendingProposalRow(
         Guid Id,
         string MatchLabel,
@@ -994,6 +1049,9 @@ else
 
         [Required(ErrorMessage = "El nombre del jugador es obligatorio.")]
         public string PlayerName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Selecciona un jugador del plantel.")]
+        public Guid? PlayerId { get; set; }
 
         [Range(0, 130, ErrorMessage = "El minuto debe estar entre 0 y 130.")]
         public int Minute { get; set; }

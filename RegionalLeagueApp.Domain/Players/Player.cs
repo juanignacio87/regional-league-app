@@ -10,12 +10,14 @@ public sealed class Player : Entity
     public Team? Team { get; private set; }
     public string FirstName { get; private set; } = string.Empty;
     public string LastName { get; private set; } = string.Empty;
+    public string DisplayName { get; private set; } = string.Empty;
     public int? ShirtNumber { get; private set; }
+    public bool IsActive { get; private set; } = true;
     public PlayerPosition Position { get; private set; }
     public DateOnly? BirthDate { get; private set; }
     public List<MatchEvent> MatchEvents { get; private set; } = [];
 
-    public string FullName => $"{FirstName} {LastName}".Trim();
+    public string FullName => string.IsNullOrWhiteSpace(DisplayName) ? $"{FirstName} {LastName}".Trim() : DisplayName;
 
     private Player()
     {
@@ -26,6 +28,7 @@ public sealed class Player : Entity
         TeamId = teamId;
         FirstName = firstName;
         LastName = lastName;
+        DisplayName = $"{firstName} {lastName}".Trim();
         Position = position;
         ShirtNumber = shirtNumber;
         BirthDate = birthDate;
