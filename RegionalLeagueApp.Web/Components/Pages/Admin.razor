@@ -3,6 +3,7 @@
 @attribute [Authorize(Policy = "RequireContributor")]
 @using System.ComponentModel.DataAnnotations
 @using System.Text.Json
+@using System.IO
 @using Microsoft.AspNetCore.SignalR
 @using Microsoft.EntityFrameworkCore
 @using RegionalLeagueApp.Application.Collaboration
@@ -14,6 +15,7 @@
 @inject IMatchScoreRecalculationService MatchScoreRecalculationService
 @inject IHubContext<MatchUpdatesHub> MatchUpdates
 @inject ILogger<Admin> Logger
+@inject IWebHostEnvironment Environment
 
 <PageTitle>Admin</PageTitle>
 
@@ -52,6 +54,33 @@
 
 @if (access.CanModerate)
 {
+    <section class="panel admin-logo-panel">
+        <div class="panel-title-row">
+            <div>
+                <p class="eyebrow">Clubes</p>
+                <h2>Logo del club</h2>
+            </div>
+            <span>@clubLogoOptions.Count club(es)</span>
+        </div>
+
+        <div class="admin-logo-form">
+            <div>
+                <label for="club-logo-select">Club</label>
+                <select id="club-logo-select" class="form-control" @bind="selectedLogoClubId">
+                    @foreach (var club in clubLogoOptions)
+                    {
+                        <option value="@club.Id">@club.Name</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label for="club-logo-file">Imagen</label>
+                <InputFile id="club-logo-file" OnChange="UploadClubLogoAsync" accept="image/png,image/jpeg,image/webp,image/gif" />
+                <small>PNG, JPG, WebP o GIF. Maximo 1 MB.</small>
+            </div>
+        </div>
+    </section>
+
     <section class="panel admin-proposals">
         <div class="panel-title-row">
             <div>
@@ -325,7 +354,9 @@ else
     private readonly List<AdminMatchEventRow> selectedEvents = [];
     private readonly List<EventPlayerOption> eventPlayers = [];
     private readonly List<PendingProposalRow> pendingProposals = [];
+    private readonly List<ClubLogoOption> clubLogoOptions = [];
     private MatchAdministrationAccess access = MatchAdministrationAccess.Empty;
+    private Guid selectedLogoClubId;
     private bool isSaving;
     private bool isSavingEvent;
     private bool isReviewingProposal;
@@ -341,6 +372,16 @@ else
         MatchEventType.RedCard
     ];
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly HashSet<string> AllowedLogoExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".webp",
+        ".gif"
+    };
+
+    private const long MaxLogoBytes = 1 * 1024 * 1024;
 
     private string PermissionSummary => access.CanManageAllMatches
         ? "Puede editar cualquier partido y moderar eventos."
@@ -371,6 +412,7 @@ else
         access = await PermissionService.GetAccessAsync();
         await LoadMatchesAsync();
         await LoadPendingProposalsAsync();
+        await LoadClubLogoOptionsAsync();
 
         if (RequestedMatchId is { } matchId)
         {
@@ -439,6 +481,84 @@ else
             x.ProposedBy,
             x.CreatedAt,
             ProposalDescription(x.ChangeType, x.PayloadJson, x.ProposedStatus))));
+    }
+
+    private async Task LoadClubLogoOptionsAsync()
+    {
+        clubLogoOptions.Clear();
+
+        if (!access.CanModerate)
+        {
+            return;
+        }
+
+        clubLogoOptions.AddRange(await Db.Clubs
+            .AsNoTracking()
+            .OrderBy(x => x.Name)
+            .Select(x => new ClubLogoOption(x.Id, x.Name, x.LogoPath))
+            .ToListAsync());
+
+        if (selectedLogoClubId == Guid.Empty && clubLogoOptions.Count > 0)
+        {
+            selectedLogoClubId = clubLogoOptions[0].Id;
+        }
+    }
+
+    private async Task UploadClubLogoAsync(InputFileChangeEventArgs args)
+    {
+        successMessage = null;
+        errorMessage = null;
+
+        if (!access.CanModerate)
+        {
+            errorMessage = "No tenes permisos para cargar logos.";
+            return;
+        }
+
+        if (selectedLogoClubId == Guid.Empty)
+        {
+            errorMessage = "Selecciona un club.";
+            return;
+        }
+
+        var file = args.File;
+        var extension = Path.GetExtension(file.Name);
+        if (!file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase) || !AllowedLogoExtensions.Contains(extension))
+        {
+            errorMessage = "El archivo debe ser una imagen valida.";
+            return;
+        }
+
+        if (file.Size > MaxLogoBytes)
+        {
+            errorMessage = "La imagen no puede superar 1 MB.";
+            return;
+        }
+
+        var club = await Db.Clubs.FirstOrDefaultAsync(x => x.Id == selectedLogoClubId);
+        if (club is null)
+        {
+            errorMessage = "No se encontro el club seleccionado.";
+            return;
+        }
+
+        var uploadsPath = Path.Combine(Environment.WebRootPath, "uploads", "clubs");
+        Directory.CreateDirectory(uploadsPath);
+
+        var fileName = $"{club.Id:N}-{Guid.NewGuid():N}{extension.ToLowerInvariant()}";
+        var physicalPath = Path.Combine(uploadsPath, fileName);
+
+        await using (var stream = File.Create(physicalPath))
+        {
+            await file.OpenReadStream(MaxLogoBytes).CopyToAsync(stream);
+        }
+
+        club.SetLogoPath($"/uploads/clubs/{fileName}");
+        await Db.SaveChangesAsync();
+        await LoadClubLogoOptionsAsync();
+        await LoadMatchesAsync();
+        await NotifyMatchDataChangedAsync();
+        successMessage = "Logo actualizado correctamente.";
     }
 
     private async Task SelectMatchAsync(Guid matchId)
@@ -1041,6 +1161,11 @@ else
         string ProposedBy,
         DateTimeOffset CreatedAt,
         string Description);
+
+    private sealed record ClubLogoOption(
+        Guid Id,
+        string Name,
+        string? LogoPath);
 
     private sealed class EventCreateModel
     {

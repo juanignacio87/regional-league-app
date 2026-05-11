@@ -1,0 +1,211 @@
+@page "/players/{Id:guid}"
+@rendermode InteractiveServer
+@implements IDisposable
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+@inject MatchUpdatesClient MatchUpdatesClient
+
+<PageTitle>Jugador</PageTitle>
+
+@if (player is null)
+{
+    <EmptyState Text="Jugador no encontrado." />
+}
+else
+{
+    <section class="player-profile-hero">
+        <div class="player-profile-avatar">@Initials(player.DisplayName)</div>
+        <div>
+            <p class="eyebrow">Jugador</p>
+            <h1>@player.DisplayName</h1>
+            <div class="player-profile-meta">
+                <span>@TeamName</span>
+                @if (player.ShirtNumber is not null)
+                {
+                    <span>#@player.ShirtNumber</span>
+                }
+                <span class="@(player.IsActive ? "player-status-active" : "player-status-inactive")">
+                    @(player.IsActive ? "Activo" : "Inactivo")
+                </span>
+            </div>
+        </div>
+    </section>
+
+    <section class="player-profile-grid">
+        <article class="panel">
+            <h2>Estadisticas</h2>
+            <div class="player-stat-grid">
+                <div class="player-stat-card">
+                    <strong>@stats.Goals</strong>
+                    <span>Goles</span>
+                </div>
+                <div class="player-stat-card">
+                    <strong>@stats.YellowCards</strong>
+                    <span>Amarillas</span>
+                </div>
+                <div class="player-stat-card">
+                    <strong>@stats.RedCards</strong>
+                    <span>Rojas</span>
+                </div>
+                <div class="player-stat-card">
+                    <strong>@stats.MatchesPlayed</strong>
+                    <span>Partidos</span>
+                </div>
+                <div class="player-stat-card player-stat-card-wide">
+                    <strong>@stats.GoalsPerMatch.ToString("0.00")</strong>
+                    <span>Goles por partido</span>
+                </div>
+            </div>
+        </article>
+
+        <article class="panel">
+            <h2>Historial reciente</h2>
+            @if (history.Count == 0)
+            {
+                <EmptyState Text="No hay eventos registrados para este jugador." />
+            }
+            else
+            {
+                <div class="player-event-list">
+                    @foreach (var item in history)
+                    {
+                        <a class="player-event-row" href="matches/@item.MatchId">
+                            <span class="player-event-minute">@item.Minute'</span>
+                            <div>
+                                <strong>@EventLabel(item.EventType)</strong>
+                                <small>@item.MatchLabel</small>
+                            </div>
+                            <time>@item.StartsAt.LocalDateTime.ToString("dd/MM/yyyy")</time>
+                        </a>
+                    }
+                </div>
+            }
+        </article>
+    </section>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private Player? player;
+    private PlayerStats stats = PlayerStats.Empty;
+    private readonly List<PlayerEventRow> history = [];
+    private Func<Task>? reloadHandler;
+
+    private string TeamName => player?.Team?.Club?.Name ?? "Sin equipo";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        reloadHandler = () => InvokeAsync(async () =>
+        {
+            await LoadAsync();
+            StateHasChanged();
+        });
+
+        await MatchUpdatesClient.SubscribeAsync(reloadHandler);
+    }
+
+    public void Dispose()
+    {
+        if (reloadHandler is not null)
+        {
+            MatchUpdatesClient.Unsubscribe(reloadHandler);
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        player = await Db.Players
+            .AsNoTracking()
+            .Include(x => x.Team)!.ThenInclude(x => x!.Club)
+            .FirstOrDefaultAsync(x => x.Id == Id);
+
+        if (player is null)
+        {
+            stats = PlayerStats.Empty;
+            history.Clear();
+            return;
+        }
+
+        var events = await Db.MatchEvents
+            .AsNoTracking()
+            .Where(x => x.PlayerId == Id)
+            .Select(x => new
+            {
+                x.MatchId,
+                x.Type,
+                x.Minute,
+                StartsAt = x.Match != null ? x.Match.StartsAt : DateTimeOffset.MinValue,
+                HomeTeam = x.Match != null && x.Match.HomeTeam != null ? x.Match.HomeTeam.Club!.ShortName : "Local",
+                AwayTeam = x.Match != null && x.Match.AwayTeam != null ? x.Match.AwayTeam.Club!.ShortName : "Visitante"
+            })
+            .ToListAsync();
+
+        var matchesPlayed = events.Select(x => x.MatchId).Distinct().Count();
+        var goals = events.Count(x => x.Type == MatchEventType.Goal);
+
+        stats = new PlayerStats(
+            goals,
+            events.Count(x => x.Type == MatchEventType.YellowCard),
+            events.Count(x => x.Type == MatchEventType.RedCard),
+            matchesPlayed,
+            matchesPlayed == 0 ? 0 : (decimal)goals / matchesPlayed);
+
+        history.Clear();
+        history.AddRange(events
+            .OrderByDescending(x => x.StartsAt)
+            .ThenByDescending(x => x.Minute)
+            .Take(10)
+            .Select(x => new PlayerEventRow(
+                x.MatchId,
+                $"{x.HomeTeam} vs {x.AwayTeam}",
+                x.Type,
+                x.Minute,
+                x.StartsAt)));
+    }
+
+    private static string Initials(string name)
+    {
+        var initials = string.Concat(name
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Take(2)
+            .Select(x => x[0]));
+
+        return string.IsNullOrWhiteSpace(initials) ? "JR" : initials.ToUpperInvariant();
+    }
+
+    private static string EventLabel(MatchEventType eventType) => eventType switch
+    {
+        MatchEventType.Goal => "Gol",
+        MatchEventType.YellowCard => "Tarjeta amarilla",
+        MatchEventType.RedCard => "Tarjeta roja",
+        _ => eventType.ToString()
+    };
+
+    private sealed record PlayerStats(
+        int Goals,
+        int YellowCards,
+        int RedCards,
+        int MatchesPlayed,
+        decimal GoalsPerMatch)
+    {
+        public static PlayerStats Empty { get; } = new(0, 0, 0, 0, 0);
+    }
+
+    private sealed record PlayerEventRow(
+        Guid MatchId,
+        string MatchLabel,
+        MatchEventType EventType,
+        int Minute,
+        DateTimeOffset StartsAt);
+}

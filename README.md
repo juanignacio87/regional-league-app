@@ -23,6 +23,97 @@ dotnet build RegionalLeagueApp.sln -m:1
 
 `global.json` fija el SDK en .NET 8 para mantener la solucion alineada con el target `net8.0`.
 
+## Deploy con Docker Compose
+
+El deploy productivo simple usa:
+
+- `Dockerfile`: build multi-stage para publicar `RegionalLeagueApp.Web` en una imagen ASP.NET Core 8 Alpine.
+- `docker-compose.yml`: app web + PostgreSQL 16 + volumen de uploads.
+- `.env`: variables reales locales al host. No se versiona.
+
+### 1. Crear variables de entorno
+
+```bash
+cp .env.example .env
+```
+
+Editar `.env` y cambiar al menos:
+
+```text
+POSTGRES_PASSWORD=change_this_postgres_password
+SEED_ADMIN_PASSWORD=ChangeThisAdmin123!
+SEED_MODERATOR_PASSWORD=ChangeThisModerator123!
+SEED_CONTRIBUTOR_PASSWORD=ChangeThisContributor123!
+```
+
+Para un primer deploy se puede dejar `SEED_ENABLED=true` para crear usuarios demo. Despues del primer arranque, cambiar a:
+
+```text
+SEED_ENABLED=false
+```
+
+### 2. Levantar servicios
+
+```bash
+docker compose up -d --build
+```
+
+La app queda disponible en:
+
+```text
+http://localhost:8080
+```
+
+Se puede cambiar el puerto con `WEB_PORT` en `.env`.
+
+### 3. Migraciones
+
+No hay comando manual separado: al iniciar, la app ejecuta `Database.MigrateAsync()` y aplica migraciones pendientes sobre PostgreSQL. Luego ejecuta el seed solo si `Seed__Enabled=true`.
+
+### 4. Healthchecks
+
+PostgreSQL usa:
+
+```text
+pg_isready
+```
+
+La web expone:
+
+```text
+/health
+```
+
+Ver estado:
+
+```bash
+docker compose ps
+```
+
+### 5. Uploads persistentes
+
+Los logos subidos desde Admin se guardan en:
+
+```text
+/app/wwwroot/uploads
+```
+
+En Docker Compose quedan persistidos en el volumen:
+
+```text
+regional-league-app-uploads
+```
+
+### 6. Credenciales demo
+
+Si `SEED_ENABLED=true`, se crean las cuentas definidas en `.env`:
+
+- Admin: `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`
+- Moderator: `SEED_MODERATOR_EMAIL` / `SEED_MODERATOR_PASSWORD`
+- Contributor: `SEED_CONTRIBUTOR_EMAIL` / `SEED_CONTRIBUTOR_PASSWORD`
+
+Para produccion real, usar passwords fuertes, desactivar el seed despues del primer arranque y colocar la app detras de un reverse proxy con HTTPS.
+
 ## Entornos de base de datos
 
 La app usa la connection string `ConnectionStrings:DefaultConnection`.

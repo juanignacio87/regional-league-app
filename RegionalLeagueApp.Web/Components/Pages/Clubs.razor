@@ -19,7 +19,7 @@ else
         @foreach (var club in clubs)
         {
             <a class="club-card" href="clubs/@club.Id">
-                <span class="club-dot" style="background:@(club.PrimaryColor ?? "#14532d")"></span>
+                <ClubLogo Name="@club.Name" LogoPath="@club.LogoPath" />
                 <strong>@club.Name</strong>
                 <small>@club.Venue?.Name - @club.Venue?.City</small>
             </a>

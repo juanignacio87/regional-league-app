@@ -39,7 +39,12 @@ else
                 {
                     <tr class="@(row.Position == 1 ? "leader-row" : string.Empty)">
                         <td><strong>@row.Position</strong></td>
-                        <td><a href="clubs/@row.ClubId">@row.ClubName</a></td>
+                        <td>
+                            <a class="standings-club-link" href="clubs/@row.ClubId">
+                                <ClubLogo Name="@row.ClubName" LogoPath="@row.ClubLogoPath" Class="club-logo-xs" />
+                                @row.ClubName
+                            </a>
+                        </td>
                         <td>@row.Played</td>
                         <td>@row.Won</td>
                         <td>@row.Drawn</td>

@@ -31,7 +31,7 @@ else
 
         <div class="match-center-scoreboard">
             <div class="match-center-team">
-                <div class="match-center-crest">@Initials(HomeClubName(match))</div>
+                <ClubLogo Name="@HomeClubName(match)" LogoPath="@match.HomeTeam?.Club?.LogoPath" Class="match-center-crest" />
                 <h1>@HomeClubName(match)</h1>
                 <small>Local</small>
             </div>
@@ -43,7 +43,7 @@ else
             </div>
 
             <div class="match-center-team match-center-team--away">
-                <div class="match-center-crest">@Initials(AwayClubName(match))</div>
+                <ClubLogo Name="@AwayClubName(match)" LogoPath="@match.AwayTeam?.Club?.LogoPath" Class="match-center-crest" />
                 <h1>@AwayClubName(match)</h1>
                 <small>Visitante</small>
             </div>
@@ -69,7 +69,16 @@ else
                         <div class="match-timeline-event @(IsHomeEvent(item) ? "match-timeline-event--home" : "match-timeline-event--away")">
                             <div class="match-timeline-body">
                                 <strong>@EventLabel(item.Type)</strong>
-                                <small>@PlayerText(item)</small>
+                                <small>
+                                    @if (item.PlayerId is not null)
+                                    {
+                                        <a href="players/@item.PlayerId">@PlayerText(item)</a>
+                                    }
+                                    else
+                                    {
+                                        @PlayerText(item)
+                                    }
+                                </small>
                             </div>
                             <span class="match-timeline-minute">@item.Minute'</span>
                             <span class="match-timeline-icon @EventIconClass(item.Type)">@EventIconText(item.Type)</span>
@@ -243,17 +252,6 @@ else
         MatchStatus.Finished => "match-center-status--finished",
         _ => "match-center-status--scheduled"
     };
-
-    private static string Initials(string name)
-    {
-        var parts = name
-            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Take(2)
-            .Select(part => part[0]);
-
-        var initials = string.Concat(parts);
-        return string.IsNullOrWhiteSpace(initials) ? "FC" : initials.ToUpperInvariant();
-    }
 
     private bool IsHomeEvent(MatchEvent item) => match?.HomeTeamId == item.TeamId;
 

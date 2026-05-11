@@ -2,74 +2,176 @@
 @rendermode InteractiveServer
 @implements IDisposable
 @using Microsoft.EntityFrameworkCore
+@using RegionalLeagueApp.Application.Standings
 @inject ApplicationDbContext Db
+@inject IStandingsQueryService StandingsQueryService
 @inject MatchUpdatesClient MatchUpdatesClient
 
 <PageTitle>Liga Regional</PageTitle>
 
-<section class="page-hero">
-    <div>
-        <p class="eyebrow">Liga Regional</p>
-        <h1>Fixture, resultados y tabla de posiciones</h1>
-        <p>Informacion publica de la competencia regional, preparada para crecer con carga colaborativa y moderacion.</p>
-        <div class="hero-actions">
-            <a href="fixture">Ver fixture</a>
-            <a href="standings">Tabla</a>
+<section class="home-hero">
+    <div class="home-hero__content">
+        <p class="eyebrow">Liga Regional Norte</p>
+        <h1>Partidos, tabla y protagonistas de la liga regional</h1>
+        <p>Segui fixture, resultados, goleadores y clubes en una experiencia moderna preparada para carga colaborativa.</p>
+        <div class="home-hero__actions">
+            <a href="fixture">Ver partidos</a>
+            <a href="standings">Ver tabla</a>
         </div>
+    </div>
+    <div class="home-hero__panel">
+        <span>Temporada 2026</span>
+        <strong>@HeroStat</strong>
+        <small>partidos cargados</small>
     </div>
 </section>
 
-<section class="content-grid">
-    <article class="panel">
-        <div class="panel-title">
-            <h2>Proximos partidos</h2>
-            <a href="fixture">Ver fixture</a>
+<section class="home-section home-live">
+    <div class="home-section__title">
+        <div>
+            <p class="eyebrow">En vivo</p>
+            <h2>Partidos destacados</h2>
+        </div>
+        <a href="fixture">Fixture completo</a>
+    </div>
+
+    @if (liveMatches.Count == 0)
+    {
+        <div class="home-empty">No hay partidos en vivo ahora.</div>
+    }
+    else
+    {
+        <div class="home-match-grid">
+            @foreach (var match in liveMatches)
+            {
+                <MatchSummary Match="match" />
+            }
+        </div>
+    }
+</section>
+
+<section class="home-main-grid">
+    <article class="panel home-card">
+        <div class="home-section__title">
+            <div>
+                <p class="eyebrow">Agenda</p>
+                <h2>Proximos partidos</h2>
+            </div>
+            <a href="fixture">Ver todos</a>
         </div>
         @if (upcomingMatches.Count == 0)
         {
-            <p class="muted">No hay partidos programados.</p>
+            <div class="home-empty">No hay partidos programados.</div>
         }
-        @foreach (var match in upcomingMatches)
+        else
         {
-            <MatchSummary Match="match" />
-        }
-    </article>
-
-    <article class="panel">
-        <div class="panel-title">
-            <h2>Ultimos resultados</h2>
-            <a href="results">Ver resultados</a>
-        </div>
-        @if (latestResults.Count == 0)
-        {
-            <p class="muted">Todavia no hay resultados.</p>
-        }
-        @foreach (var match in latestResults)
-        {
-            <MatchSummary Match="match" />
+            <div class="home-match-list">
+                @foreach (var match in upcomingMatches)
+                {
+                    <MatchSummary Match="match" />
+                }
+            </div>
         }
     </article>
 
-    <article class="panel">
-        <div class="panel-title">
-            <h2>En vivo / destacados</h2>
+    <article class="panel home-card">
+        <div class="home-section__title">
+            <div>
+                <p class="eyebrow">Tabla rapida</p>
+                <h2>Top 5</h2>
+            </div>
+            <a href="standings">Tabla completa</a>
         </div>
-        @if (featuredMatches.Count == 0)
+        @if (topStandings.Count == 0)
         {
-            <p class="muted">No hay partidos en vivo ahora.</p>
+            <div class="home-empty">No hay tabla disponible.</div>
         }
-        @foreach (var match in featuredMatches)
+        else
         {
-            <MatchSummary Match="match" />
+            <div class="home-standings-list">
+                @foreach (var row in topStandings)
+                {
+                    <a class="home-standing-row" href="clubs/@row.ClubId">
+                        <span>@row.Position</span>
+                        <ClubLogo Name="@row.ClubName" LogoPath="@row.ClubLogoPath" Class="club-logo-xs" />
+                        <strong>@row.ClubName</strong>
+                        <b>@row.Points</b>
+                    </a>
+                }
+            </div>
+        }
+    </article>
+</section>
+
+<section class="home-main-grid">
+    <article class="panel home-card">
+        <div class="home-section__title">
+            <div>
+                <p class="eyebrow">Goleadores</p>
+                <h2>Destacados</h2>
+            </div>
+            <a href="scorers">Ranking</a>
+        </div>
+        @if (topScorers.Count == 0)
+        {
+            <div class="home-empty">Todavia no hay goles registrados.</div>
+        }
+        else
+        {
+            <div class="home-scorer-list">
+                @foreach (var scorer in topScorers)
+                {
+                    <a class="home-scorer-row" href="@PlayerUrl(scorer)">
+                        <span>@Initials(scorer.PlayerName)</span>
+                        <div>
+                            <strong>@scorer.PlayerName</strong>
+                            <small>@scorer.TeamName</small>
+                        </div>
+                        <b>@scorer.Goals</b>
+                    </a>
+                }
+            </div>
+        }
+    </article>
+
+    <article class="panel home-card">
+        <div class="home-section__title">
+            <div>
+                <p class="eyebrow">Clubes</p>
+                <h2>Participantes</h2>
+            </div>
+            <a href="clubs">Ver clubes</a>
+        </div>
+        @if (featuredClubs.Count == 0)
+        {
+            <div class="home-empty">No hay clubes cargados.</div>
+        }
+        else
+        {
+            <div class="home-club-grid">
+                @foreach (var club in featuredClubs)
+                {
+                    <a class="home-club-card" href="clubs/@club.Id">
+                        <ClubLogo Name="@club.Name" LogoPath="@club.LogoPath" />
+                        <strong>@club.ShortName</strong>
+                        <small>@club.Name</small>
+                    </a>
+                }
+            </div>
         }
     </article>
 </section>
 
 @code {
+    private List<Match> liveMatches = [];
     private List<Match> upcomingMatches = [];
-    private List<Match> latestResults = [];
-    private List<Match> featuredMatches = [];
+    private IReadOnlyList<StandingRowDto> topStandings = [];
+    private List<HomeScorerRow> topScorers = [];
+    private List<HomeClubRow> featuredClubs = [];
+    private int totalMatches;
     private Func<Task>? reloadHandler;
+
+    private string HeroStat => totalMatches.ToString();
 
     protected override async Task OnInitializedAsync()
     {
@@ -102,22 +204,27 @@
 
     private async Task LoadAsync()
     {
+        totalMatches = await Db.Matches.AsNoTracking().CountAsync();
+
+        liveMatches = await MatchQuery()
+            .Where(x => x.Status == MatchStatus.Live || x.Status == MatchStatus.HalfTime)
+            .OrderBy(x => x.StartsAt)
+            .Take(4)
+            .ToListAsync();
+
         upcomingMatches = await MatchQuery()
             .Where(x => x.Status == MatchStatus.Scheduled)
             .OrderBy(x => x.StartsAt)
-            .Take(5)
+            .Take(6)
             .ToListAsync();
 
-        latestResults = await MatchQuery()
-            .Where(x => x.Status == MatchStatus.Finished)
-            .OrderByDescending(x => x.StartsAt)
-            .Take(5)
-            .ToListAsync();
-
-        featuredMatches = await MatchQuery()
-            .Where(x => x.Status == MatchStatus.Live || x.Status == MatchStatus.HalfTime)
-            .OrderBy(x => x.StartsAt)
-            .Take(5)
+        topStandings = (await StandingsQueryService.GetStandingsAsync()).Take(5).ToList();
+        topScorers = await LoadTopScorersAsync();
+        featuredClubs = await Db.Clubs
+            .AsNoTracking()
+            .OrderBy(x => x.Name)
+            .Take(8)
+            .Select(x => new HomeClubRow(x.Id, x.Name, x.ShortName, x.LogoPath))
             .ToListAsync();
     }
 
@@ -126,4 +233,56 @@
         .Include(x => x.Round)
         .Include(x => x.HomeTeam)!.ThenInclude(x => x!.Club)
         .Include(x => x.AwayTeam)!.ThenInclude(x => x!.Club);
+
+    private async Task<List<HomeScorerRow>> LoadTopScorersAsync()
+    {
+        var goalEvents = await Db.MatchEvents
+            .AsNoTracking()
+            .Where(x => x.Type == MatchEventType.Goal && (x.PlayerId != null || x.PlayerName != string.Empty))
+            .Select(x => new
+            {
+                x.PlayerId,
+                PlayerName = x.PlayerName != string.Empty
+                    ? x.PlayerName
+                    : x.Player != null
+                        ? x.Player.DisplayName
+                        : string.Empty,
+                TeamName = x.Team != null ? x.Team.Club!.Name : "Sin equipo"
+            })
+            .ToListAsync();
+
+        return goalEvents
+            .Where(x => !string.IsNullOrWhiteSpace(x.PlayerName))
+            .GroupBy(x => new
+            {
+                PlayerKey = x.PlayerId?.ToString() ?? x.PlayerName.Trim().ToUpperInvariant(),
+                x.TeamName
+            })
+            .Select(group => new HomeScorerRow(
+                group.First().PlayerId,
+                group.OrderByDescending(x => x.PlayerId != null).First().PlayerName,
+                group.Key.TeamName,
+                group.Count()))
+            .OrderByDescending(x => x.Goals)
+            .ThenBy(x => x.PlayerName)
+            .Take(5)
+            .ToList();
+    }
+
+    private static string PlayerUrl(HomeScorerRow scorer) =>
+        scorer.PlayerId is null ? "scorers" : $"players/{scorer.PlayerId}";
+
+    private static string Initials(string name)
+    {
+        var initials = string.Concat(name
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Take(2)
+            .Select(x => x[0]));
+
+        return string.IsNullOrWhiteSpace(initials) ? "JG" : initials.ToUpperInvariant();
+    }
+
+    private sealed record HomeScorerRow(Guid? PlayerId, string PlayerName, string TeamName, int Goals);
+
+    private sealed record HomeClubRow(Guid Id, string Name, string ShortName, string? LogoPath);
 }

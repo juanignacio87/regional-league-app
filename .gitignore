@@ -9,4 +9,3 @@ obj/
 DockerDesktop.vhdx
 .env
 appsettings.Local.json
-appsettings.Production.json

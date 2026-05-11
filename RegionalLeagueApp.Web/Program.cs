@@ -23,6 +23,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddScoped<MatchUpdatesClient>();
 builder.Services.AddSignalR();
+builder.Services.AddHealthChecks();
 
 builder.Services
     .AddAuthentication(IdentityConstants.ApplicationScheme)
@@ -86,6 +87,7 @@ app.MapPost("/account/logout", async (SignInManager<ApplicationIdentityUser> sig
 }).DisableAntiforgery();
 
 app.MapHub<MatchUpdatesHub>(MatchUpdatesHub.Route);
+app.MapHealthChecks("/health");
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

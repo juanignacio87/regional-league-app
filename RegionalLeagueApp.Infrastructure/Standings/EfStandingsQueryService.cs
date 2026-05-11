@@ -18,7 +18,8 @@ public sealed class EfStandingsQueryService(ApplicationDbContext dbContext) : IS
                 CompetitionName = team.Competition!.Name,
                 TeamId = team.Id,
                 team.ClubId,
-                ClubName = team.Club!.Name
+                ClubName = team.Club!.Name,
+                ClubLogoPath = team.Club.LogoPath
             })
             .ToListAsync(cancellationToken);
 
@@ -93,6 +94,7 @@ public sealed class EfStandingsQueryService(ApplicationDbContext dbContext) : IS
                     team.TeamId,
                     team.ClubId,
                     team.ClubName,
+                    team.ClubLogoPath,
                     stat?.Played ?? 0,
                     stat?.Won ?? 0,
                     stat?.Drawn ?? 0,
@@ -113,6 +115,7 @@ public sealed class EfStandingsQueryService(ApplicationDbContext dbContext) : IS
                 row.TeamId,
                 row.ClubId,
                 row.ClubName,
+                row.ClubLogoPath,
                 row.Played,
                 row.Won,
                 row.Drawn,
@@ -130,6 +133,7 @@ public sealed class EfStandingsQueryService(ApplicationDbContext dbContext) : IS
         Guid TeamId,
         Guid ClubId,
         string ClubName,
+        string? ClubLogoPath,
         int Played,
         int Won,
         int Drawn,

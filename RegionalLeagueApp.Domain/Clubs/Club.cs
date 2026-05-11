@@ -8,6 +8,7 @@ public sealed class Club : Entity
     public string Name { get; private set; } = string.Empty;
     public string ShortName { get; private set; } = string.Empty;
     public string? PrimaryColor { get; private set; }
+    public string? LogoPath { get; private set; }
     public int? FoundedYear { get; private set; }
     public Guid? VenueId { get; private set; }
     public Venue? Venue { get; private set; }
@@ -25,5 +26,10 @@ public sealed class Club : Entity
         PrimaryColor = primaryColor;
         FoundedYear = foundedYear;
         VenueId = venueId;
+    }
+
+    public void SetLogoPath(string? logoPath)
+    {
+        LogoPath = string.IsNullOrWhiteSpace(logoPath) ? null : logoPath.Trim();
     }
 }

@@ -31,7 +31,16 @@ else
                 @foreach (var scorer in scorers)
                 {
                     <tr>
-                        <td>@scorer.PlayerName</td>
+                        <td>
+                            @if (scorer.PlayerId is not null)
+                            {
+                                <a href="players/@scorer.PlayerId">@scorer.PlayerName</a>
+                            }
+                            else
+                            {
+                                @scorer.PlayerName
+                            }
+                        </td>
                         <td>@scorer.TeamName</td>
                         <td><strong>@scorer.Goals</strong></td>
                     </tr>
@@ -99,7 +108,8 @@ else
                 x.TeamName
             })
             .Select(group => new ScorerRow(
-                group.OrderByDescending(x => x.PlayerId != null).Last().PlayerName,
+                group.First().PlayerId,
+                group.OrderByDescending(x => x.PlayerId != null).First().PlayerName,
                 group.Key.TeamName,
                 group.Count()))
             .OrderByDescending(x => x.Goals)
@@ -107,5 +117,5 @@ else
             .ToList();
     }
 
-    private sealed record ScorerRow(string PlayerName, string TeamName, int Goals);
+    private sealed record ScorerRow(Guid? PlayerId, string PlayerName, string TeamName, int Goals);
 }

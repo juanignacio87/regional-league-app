@@ -7,6 +7,7 @@ public sealed record StandingRowDto(
     Guid TeamId,
     Guid ClubId,
     string ClubName,
+    string? ClubLogoPath,
     int Played,
     int Won,
     int Drawn,

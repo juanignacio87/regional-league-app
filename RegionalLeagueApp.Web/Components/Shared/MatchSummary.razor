@@ -4,9 +4,15 @@
         <span>@Match.StartsAt.LocalDateTime.ToString("dd/MM HH:mm")</span>
     </div>
     <div class="score-line">
-        <span class="team-name">@HomeName</span>
+        <span class="team-name team-name-with-logo">
+            <ClubLogo Name="@HomeName" LogoPath="@Match.HomeTeam?.Club?.LogoPath" Class="club-logo-sm" />
+            @HomeName
+        </span>
         <b>@ScoreText</b>
-        <span class="team-name text-end">@AwayName</span>
+        <span class="team-name team-name-with-logo team-name-with-logo-away">
+            @AwayName
+            <ClubLogo Name="@AwayName" LogoPath="@Match.AwayTeam?.Club?.LogoPath" Class="club-logo-sm" />
+        </span>
     </div>
     <small class="status-pill @StatusClass">@Match.Status</small>
 </a>

@@ -1,0 +1,55 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: regional-league-app-web:latest
+    container_name: regional-league-app-web
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB:?Set POSTGRES_DB};Username=${POSTGRES_USER:?Set POSTGRES_USER};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      Seed__Enabled: ${SEED_ENABLED:-false}
+      Seed__AdminEmail: ${SEED_ADMIN_EMAIL:-admin@regional.test}
+      Seed__AdminDisplayName: ${SEED_ADMIN_DISPLAY_NAME:-Admin Regional}
+      Seed__AdminPassword: ${SEED_ADMIN_PASSWORD:-CHANGE_THIS_PASSWORD}
+      Seed__ModeratorEmail: ${SEED_MODERATOR_EMAIL:-moderator@regional.test}
+      Seed__ModeratorDisplayName: ${SEED_MODERATOR_DISPLAY_NAME:-Moderator Regional}
+      Seed__ModeratorPassword: ${SEED_MODERATOR_PASSWORD:-CHANGE_THIS_PASSWORD}
+      Seed__ContributorEmail: ${SEED_CONTRIBUTOR_EMAIL:-contributor@regional.test}
+      Seed__ContributorDisplayName: ${SEED_CONTRIBUTOR_DISPLAY_NAME:-Contributor Regional}
+      Seed__ContributorPassword: ${SEED_CONTRIBUTOR_PASSWORD:-CHANGE_THIS_PASSWORD}
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+    volumes:
+      - regional-league-app-uploads:/app/wwwroot/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8080/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: regional-league-app-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - regional-league-app-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  regional-league-app-postgres:
+  regional-league-app-uploads:
