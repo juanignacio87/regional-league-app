@@ -1,43 +1,147 @@
-# RegionalLeagueApp
+# Regional League App
 
-Base tecnica inicial para una aplicacion de liga regional de futbol con arquitectura monolitica modular.
+Plataforma web para gestionar ligas regionales de futbol: fixture, resultados, tabla de posiciones, clubes, planteles, perfiles de jugadores, eventos de partido y moderacion colaborativa.
 
-## Proyectos
+El proyecto esta pensado como una aplicacion realista de portfolio: combina una experiencia publica tipo app deportiva con un panel administrativo protegido por roles, flujo de propuestas, persistencia PostgreSQL, actualizaciones en tiempo real y deploy con Docker.
 
-- `RegionalLeagueApp.Domain`: entidades y enums puros.
-- `RegionalLeagueApp.Application`: contratos y casos de uso.
-- `RegionalLeagueApp.Infrastructure`: EF Core, PostgreSQL y servicios tecnicos.
-- `RegionalLeagueApp.Web`: Blazor Web App y composicion de la aplicacion.
+## Screenshots
 
-## Referencias
+> Reemplazar estos placeholders por capturas reales del proyecto.
 
-- Application -> Domain
-- Infrastructure -> Application, Domain
-- Web -> Application, Infrastructure
+![Home](docs/screenshots/home.png)
+![Match Center](docs/screenshots/match-center.png)
+![Admin](docs/screenshots/admin.png)
+![Standings](docs/screenshots/standings.png)
+![Scorers](docs/screenshots/scorers.png)
+![Player Profile](docs/screenshots/player-profile.png)
 
-## Build
+## Features Funcionales
 
-```powershell
-dotnet build RegionalLeagueApp.sln -m:1
+- Fixture publico con partidos programados.
+- Resultados y estados de partido.
+- Tabla de posiciones calculada desde partidos finalizados.
+- Ranking de goleadores basado en eventos reales.
+- Clubes con logos, datos basicos y planteles.
+- Perfiles publicos de jugadores.
+- Match Center con marcador, timeline, eventos y estadisticas.
+- Eventos de partido: goles, tarjetas amarillas y tarjetas rojas.
+- Roles: Admin, Moderator y Contributor.
+- Flujo de propuestas: contributors proponen cambios y moderators/admins aprueban o rechazan.
+- Score derivado automaticamente desde eventos de gol.
+- Actualizaciones en tiempo real con SignalR.
+
+## Features Tecnicas
+
+- .NET 8.
+- Blazor Web App / Blazor Server interactivity.
+- ASP.NET Core.
+- ASP.NET Core Identity.
+- Entity Framework Core.
+- PostgreSQL.
+- SignalR.
+- Docker multi-stage build.
+- Docker Compose con Postgres y volumen de uploads.
+- Healthchecks para web y base de datos.
+- Migraciones automaticas al arranque.
+- Preparado para backups mediante volumen persistente de PostgreSQL.
+- Arquitectura por capas dentro de un monolito modular.
+
+## Arquitectura
+
+La solucion mantiene una arquitectura simple por capas, sin microservicios:
+
+```text
+RegionalLeagueApp
+|
++-- Domain
+|   +-- Entidades, enums y reglas basicas del dominio
+|
++-- Application
+|   +-- Contratos, DTOs y servicios de aplicacion
+|
++-- Infrastructure
+|   +-- EF Core, PostgreSQL, Identity, seed y servicios tecnicos
+|
++-- Web
+    +-- Blazor UI, rutas, autenticacion, SignalR y composicion
 ```
 
-`global.json` fija el SDK en .NET 8 para mantener la solucion alineada con el target `net8.0`.
+Referencias:
 
-## Deploy con Docker Compose
+```text
+Application -> Domain
+Infrastructure -> Application + Domain
+Web -> Application + Infrastructure
+```
 
-El deploy productivo simple usa:
+La app es un monolito modular: evita la complejidad operativa de microservicios, pero separa responsabilidades para que el codigo sea mantenible.
 
-- `Dockerfile`: build multi-stage para publicar `RegionalLeagueApp.Web` en una imagen ASP.NET Core 8 Alpine.
-- `docker-compose.yml`: app web + PostgreSQL 16 + volumen de uploads.
-- `.env`: variables reales locales al host. No se versiona.
+## Flujos Destacados
 
-### 1. Crear variables de entorno
+### Colaboracion
+
+1. Un Contributor entra al panel Admin.
+2. Solo ve partidos donde tiene permisos.
+3. Al cargar un resultado, estado o evento, se crea una propuesta pendiente.
+4. Un Moderator o Admin revisa la propuesta.
+5. Al aprobar, se aplica el cambio real y se notifica a las paginas publicas.
+
+### Score Derivado
+
+Los goles oficiales salen de `MatchEvents` tipo `Goal`.
+
+`HomeScore` y `AwayScore` se recalculan automaticamente desde esos eventos para mantener consistencia entre:
+
+- marcador
+- timeline
+- standings
+- scorers
+- Match Center
+
+### Tiempo Real
+
+Cuando Admin/Moderator aprueba cambios o modifica eventos, la app emite `MatchDataChanged` por SignalR. Las paginas publicas relevantes refrescan sus datos sin reload manual.
+
+## Como Correr Localmente
+
+Requisitos:
+
+- .NET 8 SDK
+- Docker Desktop o Docker Engine
+
+Compilar:
+
+```powershell
+dotnet build .\RegionalLeagueApp.sln -m:1
+```
+
+### DevelopmentLocal
+
+Levantar PostgreSQL local:
+
+```powershell
+docker compose -f compose.local.yaml up -d
+```
+
+Ejecutar la app:
+
+```powershell
+dotnet run --project .\RegionalLeagueApp.Web\RegionalLeagueApp.Web.csproj --launch-profile DevelopmentLocal
+```
+
+Este perfil usa `RegionalLeagueApp.Web/appsettings.DevelopmentLocal.json` con credenciales solo de desarrollo.
+
+Las migraciones se aplican automaticamente al iniciar mediante `Database.MigrateAsync()`.
+
+## Docker Compose
+
+Crear un archivo `.env` desde la plantilla:
 
 ```bash
 cp .env.example .env
 ```
 
-Editar `.env` y cambiar al menos:
+Editar passwords y variables reales:
 
 ```text
 POSTGRES_PASSWORD=change_this_postgres_password
@@ -46,116 +150,100 @@ SEED_MODERATOR_PASSWORD=ChangeThisModerator123!
 SEED_CONTRIBUTOR_PASSWORD=ChangeThisContributor123!
 ```
 
-Para un primer deploy se puede dejar `SEED_ENABLED=true` para crear usuarios demo. Despues del primer arranque, cambiar a:
-
-```text
-SEED_ENABLED=false
-```
-
-### 2. Levantar servicios
+Levantar app + PostgreSQL:
 
 ```bash
 docker compose up -d --build
 ```
 
-La app queda disponible en:
+Acceso local:
 
 ```text
 http://localhost:8080
 ```
 
-Se puede cambiar el puerto con `WEB_PORT` en `.env`.
-
-### 3. Migraciones
-
-No hay comando manual separado: al iniciar, la app ejecuta `Database.MigrateAsync()` y aplica migraciones pendientes sobre PostgreSQL. Luego ejecuta el seed solo si `Seed__Enabled=true`.
-
-### 4. Healthchecks
-
-PostgreSQL usa:
-
-```text
-pg_isready
-```
-
-La web expone:
-
-```text
-/health
-```
-
-Ver estado:
+Estado de servicios:
 
 ```bash
 docker compose ps
 ```
 
-### 5. Uploads persistentes
-
-Los logos subidos desde Admin se guardan en:
+Healthcheck web:
 
 ```text
-/app/wwwroot/uploads
+http://localhost:8080/health
 ```
 
-En Docker Compose quedan persistidos en el volumen:
+Uploads persistentes:
 
 ```text
-regional-league-app-uploads
+regional-league-app-uploads -> /app/wwwroot/uploads
 ```
 
-### 6. Credenciales demo
+PostgreSQL persistente:
 
-Si `SEED_ENABLED=true`, se crean las cuentas definidas en `.env`:
+```text
+regional-league-app-postgres -> /var/lib/postgresql/data
+```
 
-- Admin: `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`
-- Moderator: `SEED_MODERATOR_EMAIL` / `SEED_MODERATOR_PASSWORD`
-- Contributor: `SEED_CONTRIBUTOR_EMAIL` / `SEED_CONTRIBUTOR_PASSWORD`
+## Credenciales Demo
 
-Para produccion real, usar passwords fuertes, desactivar el seed despues del primer arranque y colocar la app detras de un reverse proxy con HTTPS.
+En `DevelopmentLocal`:
 
-## Entornos de base de datos
+- Admin: `admin@regional.test` / `Admin123!`
+- Moderator: `moderator@regional.test` / `Moderator123!`
+- Contributor: `contributor@regional.test` / `Contributor123!`
 
-La app usa la connection string `ConnectionStrings:DefaultConnection`.
-No hay credenciales reales hardcodeadas. En entornos remotos se debe configurar con la variable:
+En Docker Compose, las credenciales demo salen de `.env`:
+
+- `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`
+- `SEED_MODERATOR_EMAIL` / `SEED_MODERATOR_PASSWORD`
+- `SEED_CONTRIBUTOR_EMAIL` / `SEED_CONTRIBUTOR_PASSWORD`
+
+Para un primer deploy se puede usar:
+
+```text
+SEED_ENABLED=true
+```
+
+Despues del primer arranque, cambiar a:
+
+```text
+SEED_ENABLED=false
+```
+
+## Configuracion
+
+La connection string se lee desde:
 
 ```text
 ConnectionStrings__DefaultConnection
 ```
 
-### DevelopmentLocal
-
-Usa PostgreSQL local opcional via Docker. Levantar la base:
-
-```powershell
-docker compose -f compose.local.yaml up -d
-```
-
-Ejecutar la app con el entorno `DevelopmentLocal`:
-
-```powershell
-dotnet run --project RegionalLeagueApp.Web --launch-profile DevelopmentLocal
-```
-
-Este perfil usa `RegionalLeagueApp.Web/appsettings.DevelopmentLocal.json`, con credenciales solo de desarrollo local.
-
-### ZimaBoard
-
-En ZimaBoard configurar variables de entorno reales, por ejemplo:
+Ejemplo para entorno remoto:
 
 ```bash
-export ASPNETCORE_ENVIRONMENT=ZimaBoard
-export ConnectionStrings__DefaultConnection='Host=ZIMA_HOST_OR_IP;Port=5432;Database=DB_NAME;Username=DB_USER;Password=DB_PASSWORD;SSL Mode=Prefer;Trust Server Certificate=true'
+export ASPNETCORE_ENVIRONMENT=Production
+export ConnectionStrings__DefaultConnection='Host=HOST;Port=5432;Database=DB;Username=USER;Password=PASSWORD'
 export Seed__Enabled=false
 ```
 
-Si se desea crear el admin inicial en ZimaBoard, habilitar temporalmente el seed y pasar credenciales por entorno:
+## Roadmap
 
-```bash
-export Seed__Enabled=true
-export Seed__AdminEmail='admin@example.com'
-export Seed__AdminDisplayName='Admin'
-export Seed__AdminPassword='CHANGE_THIS_PASSWORD'
-```
+- Soporte multi-liga.
+- Soporte multi-temporada avanzado.
+- Panel especifico para administradores de club.
+- Sponsors y banners por competencia/club.
+- Suite de tests automatizados.
+- CI/CD.
+- HTTPS publico con reverse proxy.
+- Backups programados documentados para PostgreSQL.
 
-Despues del primer arranque, volver `Seed__Enabled=false` para evitar depender del seed en produccion.
+## Notas de Seguridad
+
+- `.env` no se commitea.
+- Las credenciales demo son solo para desarrollo.
+- En produccion usar passwords fuertes y desactivar seed despues del primer arranque.
+- Los uploads estan limitados por tipo y tamano.
+- Los nombres de archivos subidos se generan con `Guid` para evitar sobrescrituras peligrosas.
+- Para exposicion publica se recomienda usar HTTPS detras de un reverse proxy.

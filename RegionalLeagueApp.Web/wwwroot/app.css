@@ -348,6 +348,19 @@ p {
     .home-match-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+
+    .leagues-admin {
+        grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
+    }
+
+    .leagues-form {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+    }
+
+    .leagues-edit {
+        align-items: end;
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
 }
 
 .content-grid {
@@ -548,6 +561,234 @@ p {
     align-items: center;
     display: inline-flex;
     gap: .5rem;
+    text-decoration: none;
+}
+
+.leagues-hero {
+    margin-bottom: 1rem;
+}
+
+.leagues-message {
+    border-radius: 8px;
+    font-weight: 800;
+    margin-bottom: 1rem;
+    padding: .85rem 1rem;
+}
+
+.leagues-message--success {
+    background: #e6f3ef;
+    border: 1px solid #b9ddd4;
+    color: #0f4f43;
+}
+
+.leagues-message--error {
+    background: #fff1f2;
+    border: 1px solid #fecdd3;
+    color: #9f1239;
+}
+
+.leagues-admin {
+    display: grid;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.leagues-admin h2,
+.leagues-card h2,
+.leagues-section-title h2 {
+    margin: 0;
+}
+
+.leagues-admin p {
+    color: #60716d;
+    margin-bottom: 0;
+}
+
+.leagues-form,
+.leagues-edit {
+    display: grid;
+    gap: .75rem;
+}
+
+.leagues-form label,
+.leagues-edit label {
+    color: #40514d;
+    display: grid;
+    font-size: .86rem;
+    font-weight: 800;
+    gap: .35rem;
+}
+
+.leagues-button {
+    align-self: end;
+    background: #103d35;
+    border: 0;
+    border-radius: 8px;
+    color: #fff;
+    cursor: pointer;
+    font-weight: 900;
+    padding: .7rem .9rem;
+}
+
+.leagues-button:disabled {
+    cursor: not-allowed;
+    opacity: .65;
+}
+
+.leagues-button--muted {
+    background: #e6f3ef;
+    color: #0f4f43;
+}
+
+.leagues-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.leagues-card {
+    background: #fff;
+    border: 1px solid #dfe8e5;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(15, 61, 53, .06);
+    display: grid;
+    gap: 1rem;
+    padding: 1.1rem;
+}
+
+.leagues-card__main {
+    align-items: center;
+    color: inherit;
+    display: grid;
+    gap: .8rem;
+    grid-template-columns: auto minmax(0, 1fr);
+    text-decoration: none;
+}
+
+.leagues-card__main p {
+    color: #60716d;
+    margin: .15rem 0 0;
+}
+
+.leagues-card__mark {
+    align-items: center;
+    background: #103d35;
+    border-radius: 50%;
+    color: #fff;
+    display: inline-flex;
+    font-weight: 900;
+    height: 48px;
+    justify-content: center;
+    width: 48px;
+}
+
+.leagues-card__meta,
+.leagues-summary {
+    display: grid;
+    gap: .65rem;
+}
+
+.leagues-card__meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.leagues-card__meta span,
+.leagues-summary article,
+.leagues-list-row,
+.leagues-participant {
+    background: #fbfdfc;
+    border: 1px solid #edf2f0;
+    border-radius: 8px;
+}
+
+.leagues-card__meta span {
+    color: #60716d;
+    padding: .65rem;
+}
+
+.leagues-card__meta strong {
+    color: #103d35;
+}
+
+.leagues-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-bottom: 1rem;
+}
+
+.leagues-summary article {
+    display: grid;
+    gap: .1rem;
+    padding: 1rem;
+}
+
+.leagues-summary strong {
+    color: #103d35;
+    font-size: 1.7rem;
+    line-height: 1;
+}
+
+.leagues-summary span,
+.leagues-list-row span,
+.leagues-list-row small,
+.leagues-participant span {
+    color: #60716d;
+}
+
+.leagues-list,
+.leagues-participants {
+    display: grid;
+    gap: .65rem;
+    margin-top: 1rem;
+}
+
+.leagues-list-row {
+    align-items: center;
+    display: grid;
+    gap: .75rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: .75rem;
+}
+
+.leagues-list-row span {
+    display: block;
+    font-size: .88rem;
+}
+
+.leagues-pill {
+    background: #e6f3ef;
+    border-radius: 999px;
+    color: #0f4f43 !important;
+    font-weight: 900;
+    padding: .25rem .55rem;
+}
+
+.leagues-section-title {
+    align-items: center;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+}
+
+.leagues-section-title a {
+    background: #e6f3ef;
+    border-radius: 999px;
+    color: #0f4f43;
+    font-weight: 900;
+    padding: .45rem .75rem;
+    text-decoration: none;
+}
+
+.leagues-participants {
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+.leagues-participant {
+    align-items: center;
+    color: inherit;
+    display: grid;
+    gap: .65rem;
+    grid-template-columns: auto minmax(0, 1fr);
+    padding: .75rem;
     text-decoration: none;
 }
 
@@ -1477,6 +1718,12 @@ p {
     .page-hero {
         min-height: 180px;
         padding: 1.1rem;
+    }
+
+    .leagues-summary,
+    .leagues-card__meta,
+    .leagues-list-row {
+        grid-template-columns: 1fr;
     }
 
     .panel,

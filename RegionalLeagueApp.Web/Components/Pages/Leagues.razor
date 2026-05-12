@@ -1,0 +1,301 @@
+@page "/leagues"
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Ligas</PageTitle>
+
+<section class="page-hero leagues-hero">
+    <div>
+        <p class="eyebrow">Ligas</p>
+        <h1>Competencias regionales</h1>
+        <p>Explora las ligas disponibles, sus temporadas activas y las divisiones cargadas en la plataforma.</p>
+    </div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(statusMessage))
+{
+    <div class="leagues-message @(isSuccessMessage ? "leagues-message--success" : "leagues-message--error")">
+        @statusMessage
+    </div>
+}
+
+@if (canManageLeagues)
+{
+    <section class="panel leagues-admin">
+        <div>
+            <p class="eyebrow">Administracion</p>
+            <h2>Crear liga</h2>
+            <p>Disponible para Admin y Moderator. La gestion avanzada queda para fases posteriores.</p>
+        </div>
+
+        <div class="leagues-form">
+            <label>
+                Nombre
+                <input class="form-control" value="@newLeagueName" @oninput="eventArgs => newLeagueName = eventArgs.Value?.ToString() ?? string.Empty" maxlength="150" />
+            </label>
+            <label>
+                Region
+                <input class="form-control" value="@newLeagueRegion" @oninput="eventArgs => newLeagueRegion = eventArgs.Value?.ToString() ?? string.Empty" maxlength="120" />
+            </label>
+            <label>
+                Pais
+                <input class="form-control" value="@newLeagueCountry" @oninput="eventArgs => newLeagueCountry = eventArgs.Value?.ToString() ?? string.Empty" maxlength="120" />
+            </label>
+            <button type="button" class="leagues-button" disabled="@isSaving" @onclick="CreateLeagueAsync">
+                @(isSaving ? "Guardando..." : "Crear liga")
+            </button>
+        </div>
+    </section>
+}
+
+@if (leagues.Count == 0)
+{
+    <EmptyState Text="No hay ligas cargadas." />
+}
+else
+{
+    <section class="leagues-grid">
+        @foreach (var league in leagues)
+        {
+            <article class="leagues-card">
+                <a class="leagues-card__main" href="leagues/@league.Id">
+                    <span class="leagues-card__mark">@Initials(league.Name)</span>
+                    <div>
+                        <h2>@league.Name</h2>
+                        <p>@LocationText(league.Region, league.Country)</p>
+                    </div>
+                </a>
+
+                <div class="leagues-card__meta">
+                    <span><strong>@league.SeasonCount</strong> temporadas</span>
+                    <span><strong>@league.CompetitionCount</strong> competencias</span>
+                </div>
+
+                @if (canManageLeagues)
+                {
+                    <div class="leagues-edit">
+                        <label>
+                            Editar nombre
+                            <input class="form-control" value="@GetEditName(league.Id)" @oninput="eventArgs => SetEditName(league.Id, eventArgs.Value?.ToString() ?? string.Empty)" maxlength="150" />
+                        </label>
+                        <button type="button" class="leagues-button leagues-button--muted" disabled="@isSaving" @onclick="() => UpdateLeagueNameAsync(league.Id)">
+                            Guardar
+                        </button>
+                    </div>
+                }
+            </article>
+        }
+    </section>
+}
+
+@code {
+    private readonly Dictionary<Guid, string> editNames = [];
+    private List<LeagueListItem> leagues = [];
+    private bool canManageLeagues;
+    private bool isSaving;
+    private bool isSuccessMessage;
+    private string? statusMessage;
+    private string newLeagueName = string.Empty;
+    private string newLeagueRegion = string.Empty;
+    private string newLeagueCountry = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        canManageLeagues = authState.User.IsInRole(AppRoles.Admin) || authState.User.IsInRole(AppRoles.Moderator);
+
+        await LoadLeaguesAsync();
+    }
+
+    private async Task LoadLeaguesAsync()
+    {
+        leagues = await Db.Leagues
+            .AsNoTracking()
+            .OrderBy(league => league.Name)
+            .Select(league => new LeagueListItem(
+                league.Id,
+                league.Name,
+                league.Region,
+                league.Country,
+                league.Seasons.Count,
+                league.Seasons.SelectMany(season => season.Competitions).Count()))
+            .ToListAsync();
+
+        editNames.Clear();
+        foreach (var league in leagues)
+        {
+            editNames[league.Id] = league.Name;
+        }
+    }
+
+    private async Task CreateLeagueAsync()
+    {
+        if (!canManageLeagues)
+        {
+            SetMessage("No tenes permisos para crear ligas.", false);
+            return;
+        }
+
+        var name = newLeagueName.Trim();
+        var region = newLeagueRegion.Trim();
+        var country = newLeagueCountry.Trim();
+
+        if (!ValidateLeagueInput(name, region, country, out var error))
+        {
+            SetMessage(error, false);
+            return;
+        }
+
+        var exists = await Db.Leagues.AnyAsync(league => league.Name == name && league.Region == region);
+        if (exists)
+        {
+            SetMessage("Ya existe una liga con ese nombre y region.", false);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            Db.Leagues.Add(new League(name, region, country));
+            await Db.SaveChangesAsync();
+
+            newLeagueName = string.Empty;
+            newLeagueRegion = string.Empty;
+            newLeagueCountry = string.Empty;
+            SetMessage("Liga creada correctamente.", true);
+            await LoadLeaguesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            SetMessage("No se pudo crear la liga. Revisa que los datos no esten duplicados.", false);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task UpdateLeagueNameAsync(Guid leagueId)
+    {
+        if (!canManageLeagues)
+        {
+            SetMessage("No tenes permisos para editar ligas.", false);
+            return;
+        }
+
+        var name = GetEditName(leagueId).Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            SetMessage("El nombre de la liga es obligatorio.", false);
+            return;
+        }
+
+        if (name.Length > 150)
+        {
+            SetMessage("El nombre de la liga no puede superar 150 caracteres.", false);
+            return;
+        }
+
+        var league = await Db.Leagues.FirstOrDefaultAsync(item => item.Id == leagueId);
+        if (league is null)
+        {
+            SetMessage("Liga no encontrada.", false);
+            return;
+        }
+
+        var exists = await Db.Leagues.AnyAsync(item => item.Id != leagueId && item.Name == name && item.Region == league.Region);
+        if (exists)
+        {
+            SetMessage("Ya existe otra liga con ese nombre en la misma region.", false);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            Db.Entry(league).Property(item => item.Name).CurrentValue = name;
+            await Db.SaveChangesAsync();
+
+            SetMessage("Liga actualizada correctamente.", true);
+            await LoadLeaguesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            SetMessage("No se pudo actualizar la liga.", false);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private static bool ValidateLeagueInput(string name, string region, string country, out string error)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            error = "El nombre de la liga es obligatorio.";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(region))
+        {
+            error = "La region es obligatoria.";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(country))
+        {
+            error = "El pais es obligatorio.";
+            return false;
+        }
+
+        if (name.Length > 150 || region.Length > 120 || country.Length > 120)
+        {
+            error = "Uno de los campos supera la longitud permitida.";
+            return false;
+        }
+
+        error = string.Empty;
+        return true;
+    }
+
+    private string GetEditName(Guid leagueId) => editNames.TryGetValue(leagueId, out var name) ? name : string.Empty;
+
+    private void SetEditName(Guid leagueId, string name) => editNames[leagueId] = name;
+
+    private void SetMessage(string message, bool success)
+    {
+        statusMessage = message;
+        isSuccessMessage = success;
+    }
+
+    private static string LocationText(string region, string country)
+    {
+        if (string.IsNullOrWhiteSpace(region))
+        {
+            return country;
+        }
+
+        if (string.IsNullOrWhiteSpace(country))
+        {
+            return region;
+        }
+
+        return $"{region}, {country}";
+    }
+
+    private static string Initials(string name)
+    {
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length == 0)
+        {
+            return "LG";
+        }
+
+        return string.Concat(parts.Take(2).Select(part => char.ToUpperInvariant(part[0])));
+    }
+
+    private sealed record LeagueListItem(Guid Id, string Name, string Region, string Country, int SeasonCount, int CompetitionCount);
+}

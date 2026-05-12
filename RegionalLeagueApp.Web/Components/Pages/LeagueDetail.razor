@@ -1,0 +1,190 @@
+@page "/leagues/{Id:guid}"
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+
+<PageTitle>Liga</PageTitle>
+
+@if (league is null)
+{
+    <EmptyState Text="Liga no encontrada." />
+}
+else
+{
+    <section class="page-hero leagues-hero">
+        <div>
+            <p class="eyebrow">@LocationText(league.Region, league.Country)</p>
+            <h1>@league.Name</h1>
+            <p>Temporadas, competencias y equipos vinculados a esta liga regional.</p>
+            <div class="hero-actions">
+                <a href="fixture">Fixture</a>
+                <a href="standings">Tabla</a>
+                <a href="results">Resultados</a>
+                <a href="clubs">Clubes</a>
+            </div>
+        </div>
+    </section>
+
+    <section class="leagues-summary">
+        <article>
+            <strong>@league.Seasons.Count</strong>
+            <span>Temporadas</span>
+        </article>
+        <article>
+            <strong>@competitions.Count</strong>
+            <span>Competencias</span>
+        </article>
+        <article>
+            <strong>@participants.Count</strong>
+            <span>Clubes/equipos</span>
+        </article>
+    </section>
+
+    <section class="content-grid two-col">
+        <div class="panel">
+            <p class="eyebrow">Temporadas</p>
+            <h2>Calendario competitivo</h2>
+
+            @if (league.Seasons.Count == 0)
+            {
+                <EmptyState Text="No hay temporadas asociadas." />
+            }
+            else
+            {
+                <div class="leagues-list">
+                    @foreach (var season in league.Seasons.OrderByDescending(item => item.IsActive).ThenByDescending(item => item.StartsOn))
+                    {
+                        <article class="leagues-list-row">
+                            <div>
+                                <strong>@season.Name</strong>
+                                <span>@season.StartsOn.ToString("dd/MM/yyyy") - @season.EndsOn.ToString("dd/MM/yyyy")</span>
+                            </div>
+                            @if (season.IsActive)
+                            {
+                                <small class="leagues-pill">Activa</small>
+                            }
+                        </article>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="panel">
+            <p class="eyebrow">Competencias</p>
+            <h2>Divisiones y formatos</h2>
+
+            @if (competitions.Count == 0)
+            {
+                <EmptyState Text="No hay competencias asociadas." />
+            }
+            else
+            {
+                <div class="leagues-list">
+                    @foreach (var competition in competitions)
+                    {
+                        <article class="leagues-list-row">
+                            <div>
+                                <strong>@competition.Name</strong>
+                                <span>@competition.SeasonName - @competition.Format</span>
+                            </div>
+                            <small>@competition.TeamCount equipos</small>
+                        </article>
+                    }
+                </div>
+            }
+        </div>
+    </section>
+
+    <section class="panel section-gap">
+        <div class="leagues-section-title">
+            <div>
+                <p class="eyebrow">Participantes</p>
+                <h2>Clubes y equipos</h2>
+            </div>
+            <a href="clubs">Ver clubes</a>
+        </div>
+
+        @if (participants.Count == 0)
+        {
+            <EmptyState Text="No hay equipos asociados a las competencias de esta liga." />
+        }
+        else
+        {
+            <div class="leagues-participants">
+                @foreach (var participant in participants)
+                {
+                    <a class="leagues-participant" href="clubs/@participant.ClubId">
+                        <ClubLogo Name="@participant.ClubName" LogoPath="@participant.LogoPath" />
+                        <div>
+                            <strong>@participant.ClubName</strong>
+                            <span>@participant.TeamName</span>
+                        </div>
+                    </a>
+                }
+            </div>
+        }
+    </section>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private League? league;
+    private List<CompetitionItem> competitions = [];
+    private List<ParticipantItem> participants = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        league = await Db.Leagues
+            .AsNoTracking()
+            .Include(item => item.Seasons)
+                .ThenInclude(item => item.Competitions)
+                    .ThenInclude(item => item.Teams)
+                        .ThenInclude(item => item.Club)
+            .FirstOrDefaultAsync(item => item.Id == Id);
+
+        if (league is null)
+        {
+            competitions = [];
+            participants = [];
+            return;
+        }
+
+        competitions = league.Seasons
+            .SelectMany(season => season.Competitions.Select(competition => new CompetitionItem(
+                competition.Name,
+                season.Name,
+                competition.Format,
+                competition.Teams.Count)))
+            .OrderBy(item => item.SeasonName)
+            .ThenBy(item => item.Name)
+            .ToList();
+
+        participants = league.Seasons
+            .SelectMany(season => season.Competitions)
+            .SelectMany(competition => competition.Teams)
+            .Where(team => team.Club is not null)
+            .GroupBy(team => new { team.ClubId, ClubName = team.Club!.Name, team.Club.LogoPath, team.Name })
+            .Select(group => new ParticipantItem(group.Key.ClubId, group.Key.ClubName, group.Key.LogoPath, group.Key.Name))
+            .OrderBy(item => item.ClubName)
+            .ThenBy(item => item.TeamName)
+            .ToList();
+    }
+
+    private static string LocationText(string region, string country)
+    {
+        if (string.IsNullOrWhiteSpace(region))
+        {
+            return country;
+        }
+
+        if (string.IsNullOrWhiteSpace(country))
+        {
+            return region;
+        }
+
+        return $"{region}, {country}";
+    }
+
+    private sealed record CompetitionItem(string Name, string SeasonName, string Format, int TeamCount);
+    private sealed record ParticipantItem(Guid ClubId, string ClubName, string? LogoPath, string TeamName);
+}
