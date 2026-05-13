@@ -71,7 +71,7 @@ else
                 <div class="player-event-list">
                     @foreach (var item in history)
                     {
-                        <a class="player-event-row" href="matches/@item.MatchId">
+                        <a class="player-event-row" href="/matches/@item.MatchId">
                             <span class="player-event-minute">@item.Minute'</span>
                             <div>
                                 <strong>@EventLabel(item.EventType)</strong>
@@ -130,7 +130,7 @@ else
         player = await Db.Players
             .AsNoTracking()
             .Include(x => x.Team)!.ThenInclude(x => x!.Club)
-            .FirstOrDefaultAsync(x => x.Id == Id && x.IsActive && x.Team!.IsActive && x.Team.Club!.IsActive);
+            .FirstOrDefaultAsync(x => x.Id == Id);
 
         if (player is null)
         {

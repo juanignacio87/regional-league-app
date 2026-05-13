@@ -1,6 +1,8 @@
 @page "/clubs/{Id:guid}"
+@rendermode InteractiveServer
 @using Microsoft.EntityFrameworkCore
 @inject ApplicationDbContext Db
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Club</PageTitle>
 
@@ -22,6 +24,99 @@ else
         <strong>@(club.FoundedYear?.ToString() ?? "S/D")</strong>
     </section>
 
+    @if (!string.IsNullOrWhiteSpace(statusMessage))
+    {
+        <div class="leagues-message @(isSuccessMessage ? "leagues-message--success" : "leagues-message--error")">
+            @statusMessage
+        </div>
+    }
+
+    @if (canManage)
+    {
+        <details class="panel roster-admin-shell">
+            <summary>
+                <span>
+                    <small class="eyebrow">Admin / Moderator</small>
+                    <strong>Administrar plantel</strong>
+                </span>
+                <span class="clubs-admin-shell__hint">@AllTeams.Count equipo(s)</span>
+            </summary>
+
+            @foreach (var team in AllTeams)
+            {
+                var create = GetCreateModel(team.Id);
+                <section class="roster-admin-team">
+                    <div class="roster-admin-team__header">
+                        <div>
+                            <h2>@team.Name</h2>
+                            <span>@team.Category</span>
+                        </div>
+                        <span class="leagues-status @(team.IsActive ? "leagues-status--active" : "leagues-status--archived")">@(team.IsActive ? "Activo" : "Inactivo")</span>
+                    </div>
+
+                    <div class="roster-form">
+                        <label>Display name <input class="form-control" value="@create.DisplayName" @oninput="e => create.DisplayName = e.Value?.ToString() ?? string.Empty" maxlength="160" /></label>
+                        <label>Nombre <input class="form-control" value="@create.FirstName" @oninput="e => create.FirstName = e.Value?.ToString() ?? string.Empty" maxlength="100" /></label>
+                        <label>Apellido <input class="form-control" value="@create.LastName" @oninput="e => create.LastName = e.Value?.ToString() ?? string.Empty" maxlength="100" /></label>
+                        <label>Dorsal <input class="form-control" type="number" min="1" value="@create.ShirtNumber" @oninput="e => create.ShirtNumber = e.Value?.ToString() ?? string.Empty" placeholder="10" /></label>
+                        <label>
+                            Posicion
+                            <select class="form-control" @bind="create.Position">
+                                <option value="">Sin especificar</option>
+                                @foreach (var position in Enum.GetValues<PlayerPosition>().Where(x => x != PlayerPosition.Unknown))
+                                {
+                                    <option value="@position">@position</option>
+                                }
+                            </select>
+                        </label>
+                        <label>Nacimiento <input class="form-control" type="date" value="@create.BirthDate" @oninput="e => create.BirthDate = e.Value?.ToString() ?? string.Empty" /></label>
+                        <label class="checkbox-line"><input type="checkbox" checked="@create.IsActive" @onchange="e => create.IsActive = e.Value is true" /> Activo</label>
+                        <button type="button" class="leagues-button" disabled="@isSaving" @onclick="() => CreatePlayerAsync(team.Id)">Crear jugador</button>
+                    </div>
+
+                    @if (!team.Players.Any())
+                    {
+                        <EmptyState Text="Todavia no hay jugadores cargados para este equipo." />
+                    }
+                    else
+                    {
+                        <div class="roster-admin-list">
+                            @foreach (var player in team.Players.OrderByDescending(x => x.IsActive).ThenBy(x => x.ShirtNumber ?? 999).ThenBy(x => x.DisplayName))
+                            {
+                                var edit = GetEditModel(player);
+                                <article class="roster-admin-row @(player.IsActive ? string.Empty : "is-archived")">
+                                    <div class="roster-edit-grid">
+                                        <label>Display <input class="form-control" value="@edit.DisplayName" @oninput="e => edit.DisplayName = e.Value?.ToString() ?? string.Empty" maxlength="160" /></label>
+                                        <label>Nombre <input class="form-control" value="@edit.FirstName" @oninput="e => edit.FirstName = e.Value?.ToString() ?? string.Empty" maxlength="100" /></label>
+                                        <label>Apellido <input class="form-control" value="@edit.LastName" @oninput="e => edit.LastName = e.Value?.ToString() ?? string.Empty" maxlength="100" /></label>
+                                        <label>Dorsal <input class="form-control" type="number" min="1" value="@edit.ShirtNumber" @oninput="e => edit.ShirtNumber = e.Value?.ToString() ?? string.Empty" /></label>
+                                        <label>
+                                            Posicion
+                                            <select class="form-control" @bind="edit.Position">
+                                                <option value="">Sin especificar</option>
+                                                @foreach (var position in Enum.GetValues<PlayerPosition>().Where(x => x != PlayerPosition.Unknown))
+                                                {
+                                                    <option value="@position">@position</option>
+                                                }
+                                            </select>
+                                        </label>
+                                        <label>Nacimiento <input class="form-control" type="date" value="@edit.BirthDate" @oninput="e => edit.BirthDate = e.Value?.ToString() ?? string.Empty" /></label>
+                                        <label class="checkbox-line"><input type="checkbox" checked="@edit.IsActive" @onchange="e => edit.IsActive = e.Value is true" /> Activo</label>
+                                    </div>
+                                    <div class="roster-actions">
+                                        <button type="button" class="admin-link-button" disabled="@isSaving" @onclick="() => UpdatePlayerAsync(player.Id)">Guardar</button>
+                                        <button type="button" class="admin-link-button admin-link-button-muted" disabled="@isSaving" @onclick="() => SetPlayerActiveAsync(player.Id, !player.IsActive)">@(player.IsActive ? "Archivar" : "Reactivar")</button>
+                                        <a class="admin-link-button admin-link-button-muted" href="/players/@player.Id">Perfil</a>
+                                    </div>
+                                </article>
+                            }
+                        </div>
+                    }
+                </section>
+            }
+        </details>
+    }
+
     @foreach (var team in DisplayTeams)
     {
         <section class="panel section-gap">
@@ -35,11 +130,11 @@ else
                 <div class="player-grid">
                     @foreach (var player in team.Players.Where(x => x.IsActive).OrderBy(x => x.ShirtNumber ?? 999).ThenBy(x => x.LastName))
                     {
-                        <div class="player-row">
+                        <a class="player-row" href="/players/@player.Id">
                             <strong>@(player.ShirtNumber?.ToString() ?? "-")</strong>
                             <span>@player.FullName</span>
-                            <small>@player.Position</small>
-                        </div>
+                            <small>@PositionText(player.Position)</small>
+                        </a>
                     }
                 </div>
             }
@@ -49,7 +144,22 @@ else
 
 @code {
     [Parameter] public Guid Id { get; set; }
+
+    private readonly Dictionary<Guid, PlayerEditModel> createModels = [];
+    private readonly Dictionary<Guid, PlayerEditModel> editModels = [];
     private Club? club;
+    private bool canManage;
+    private bool isSaving;
+    private bool isSuccessMessage;
+    private string? statusMessage;
+
+    private List<Team> AllTeams => club is null
+        ? []
+        : club.Teams
+            .OrderByDescending(x => x.IsActive)
+            .ThenBy(x => x.Name)
+            .ToList();
+
     private IEnumerable<Team> DisplayTeams => club is null
         ? []
         : club.Teams
@@ -60,11 +170,241 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        canManage = authState.User.IsInRole(AppRoles.Admin) || authState.User.IsInRole(AppRoles.Moderator);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
         club = await Db.Clubs
             .AsNoTracking()
             .Include(x => x.Venue)
             .Include(x => x.Teams)
-            .ThenInclude(x => x.Players)
-            .FirstOrDefaultAsync(x => x.Id == Id && x.IsActive);
+                .ThenInclude(x => x.Players)
+            .FirstOrDefaultAsync(x => x.Id == Id && (x.IsActive || canManage));
+
+        PrepareModels();
+    }
+
+    private void PrepareModels()
+    {
+        editModels.Clear();
+        foreach (var player in club?.Teams.SelectMany(x => x.Players) ?? [])
+        {
+            editModels[player.Id] = PlayerEditModel.FromPlayer(player);
+        }
+
+        foreach (var team in club?.Teams ?? [])
+        {
+            createModels.TryAdd(team.Id, new PlayerEditModel { IsActive = true });
+        }
+    }
+
+    private PlayerEditModel GetCreateModel(Guid teamId)
+    {
+        if (!createModels.TryGetValue(teamId, out var model))
+        {
+            model = new PlayerEditModel { IsActive = true };
+            createModels[teamId] = model;
+        }
+
+        return model;
+    }
+
+    private PlayerEditModel GetEditModel(Player player)
+    {
+        if (!editModels.TryGetValue(player.Id, out var model))
+        {
+            model = PlayerEditModel.FromPlayer(player);
+            editModels[player.Id] = model;
+        }
+
+        return model;
+    }
+
+    private async Task CreatePlayerAsync(Guid teamId)
+    {
+        var model = GetCreateModel(teamId);
+        var validation = await ValidatePlayerAsync(teamId, model, null);
+        if (validation is not null)
+        {
+            SetMessage(validation, false);
+            return;
+        }
+
+        var player = new Player(teamId, model.FirstName.Trim(), model.LastName.Trim(), ParsePosition(model.Position), ParseShirtNumber(model.ShirtNumber), ParseBirthDate(model.BirthDate));
+        isSaving = true;
+        try
+        {
+            Db.Players.Add(player);
+            await Db.SaveChangesAsync();
+            Db.Entry(player).Property(x => x.DisplayName).CurrentValue = model.DisplayName.Trim();
+            Db.Entry(player).Property(x => x.IsActive).CurrentValue = model.IsActive;
+            Db.Entry(player).Property(x => x.ArchivedAt).CurrentValue = model.IsActive ? null : DateTime.UtcNow;
+            await Db.SaveChangesAsync();
+            createModels[teamId] = new PlayerEditModel { IsActive = true };
+            SetMessage("Jugador creado correctamente.", true);
+            await LoadAsync();
+        }
+        catch (DbUpdateException)
+        {
+            SetMessage("No se pudo crear el jugador. Revisa que el dorsal no este duplicado.", false);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task UpdatePlayerAsync(Guid playerId)
+    {
+        if (!editModels.TryGetValue(playerId, out var model))
+        {
+            SetMessage("Jugador no encontrado.", false);
+            return;
+        }
+
+        var existing = await Db.Players.AsNoTracking().FirstOrDefaultAsync(x => x.Id == playerId);
+        if (existing is null)
+        {
+            SetMessage("Jugador no encontrado.", false);
+            return;
+        }
+
+        var validation = await ValidatePlayerAsync(existing.TeamId, model, playerId);
+        if (validation is not null)
+        {
+            SetMessage(validation, false);
+            return;
+        }
+
+        var player = await Db.Players.FirstOrDefaultAsync(x => x.Id == playerId);
+        if (player is null)
+        {
+            SetMessage("Jugador no encontrado.", false);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            Db.Entry(player).Property(x => x.DisplayName).CurrentValue = model.DisplayName.Trim();
+            Db.Entry(player).Property(x => x.FirstName).CurrentValue = model.FirstName.Trim();
+            Db.Entry(player).Property(x => x.LastName).CurrentValue = model.LastName.Trim();
+            Db.Entry(player).Property(x => x.ShirtNumber).CurrentValue = ParseShirtNumber(model.ShirtNumber);
+            Db.Entry(player).Property(x => x.Position).CurrentValue = ParsePosition(model.Position);
+            Db.Entry(player).Property(x => x.BirthDate).CurrentValue = ParseBirthDate(model.BirthDate);
+            Db.Entry(player).Property(x => x.IsActive).CurrentValue = model.IsActive;
+            Db.Entry(player).Property(x => x.ArchivedAt).CurrentValue = model.IsActive ? null : DateTime.UtcNow;
+            await Db.SaveChangesAsync();
+            SetMessage("Jugador actualizado correctamente.", true);
+            await LoadAsync();
+        }
+        catch (DbUpdateException)
+        {
+            SetMessage("No se pudo actualizar el jugador. Revisa que el dorsal no este duplicado.", false);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task SetPlayerActiveAsync(Guid playerId, bool isActive)
+    {
+        var player = await Db.Players.FirstOrDefaultAsync(x => x.Id == playerId);
+        if (player is null)
+        {
+            SetMessage("Jugador no encontrado.", false);
+            return;
+        }
+
+        if (isActive && player.ShirtNumber is not null && await ActiveShirtExistsAsync(player.TeamId, player.ShirtNumber.Value, player.Id))
+        {
+            SetMessage("No se puede reactivar: ya hay un jugador activo con ese dorsal en el equipo.", false);
+            return;
+        }
+
+        player.SetActive(isActive);
+        await Db.SaveChangesAsync();
+        SetMessage(isActive ? "Jugador reactivado." : "Jugador archivado.", true);
+        await LoadAsync();
+    }
+
+    private async Task<string?> ValidatePlayerAsync(Guid teamId, PlayerEditModel model, Guid? currentPlayerId)
+    {
+        if (string.IsNullOrWhiteSpace(model.DisplayName))
+        {
+            return "El display name es obligatorio.";
+        }
+
+        var shirtNumber = ParseShirtNumber(model.ShirtNumber);
+        if (shirtNumber is <= 0)
+        {
+            return "El dorsal debe ser un numero positivo.";
+        }
+
+        var birthDate = ParseBirthDate(model.BirthDate);
+        if (birthDate is not null && birthDate > DateOnly.FromDateTime(DateTime.Today))
+        {
+            return "La fecha de nacimiento no puede estar en el futuro.";
+        }
+
+        if (model.IsActive && shirtNumber is not null && await ActiveShirtExistsAsync(teamId, shirtNumber.Value, currentPlayerId))
+        {
+            return "Ya existe un jugador activo con ese dorsal en este equipo.";
+        }
+
+        return null;
+    }
+
+    private async Task<bool> ActiveShirtExistsAsync(Guid teamId, int shirtNumber, Guid? currentPlayerId)
+    {
+        return await Db.Players.AnyAsync(x =>
+            x.TeamId == teamId &&
+            x.IsActive &&
+            x.ShirtNumber == shirtNumber &&
+            (currentPlayerId == null || x.Id != currentPlayerId.Value));
+    }
+
+    private static int? ParseShirtNumber(string value) =>
+        int.TryParse(value, out var parsed) ? parsed : null;
+
+    private static DateOnly? ParseBirthDate(string value) =>
+        DateOnly.TryParse(value, out var parsed) ? parsed : null;
+
+    private static PlayerPosition ParsePosition(string value) =>
+        Enum.TryParse<PlayerPosition>(value, out var parsed) ? parsed : PlayerPosition.Unknown;
+
+    private static string PositionText(PlayerPosition position) =>
+        position == PlayerPosition.Unknown ? "Sin posicion" : position.ToString();
+
+    private void SetMessage(string message, bool success)
+    {
+        statusMessage = message;
+        isSuccessMessage = success;
+    }
+
+    private sealed class PlayerEditModel
+    {
+        public string DisplayName { get; set; } = string.Empty;
+        public string FirstName { get; set; } = string.Empty;
+        public string LastName { get; set; } = string.Empty;
+        public string ShirtNumber { get; set; } = string.Empty;
+        public string Position { get; set; } = string.Empty;
+        public string BirthDate { get; set; } = string.Empty;
+        public bool IsActive { get; set; } = true;
+
+        public static PlayerEditModel FromPlayer(Player player) => new()
+        {
+            DisplayName = player.DisplayName,
+            FirstName = player.FirstName,
+            LastName = player.LastName,
+            ShirtNumber = player.ShirtNumber?.ToString() ?? string.Empty,
+            Position = player.Position == PlayerPosition.Unknown ? string.Empty : player.Position.ToString(),
+            BirthDate = player.BirthDate?.ToString("yyyy-MM-dd") ?? string.Empty,
+            IsActive = player.IsActive
+        };
     }
 }

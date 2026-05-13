@@ -16,7 +16,9 @@ public sealed class PlayerConfiguration : IEntityTypeConfiguration<Player>
         builder.Property(x => x.IsActive).IsRequired();
         builder.Property(x => x.ArchivedAt);
         builder.Property(x => x.Position).HasConversion<string>().HasMaxLength(30).IsRequired();
-        builder.HasIndex(x => new { x.TeamId, x.ShirtNumber }).IsUnique();
+        builder.HasIndex(x => new { x.TeamId, x.ShirtNumber })
+            .IsUnique()
+            .HasFilter("\"IsActive\" = true AND \"ShirtNumber\" IS NOT NULL");
         builder.HasIndex(x => x.TeamId);
         builder.HasIndex(x => new { x.TeamId, x.IsActive });
     }

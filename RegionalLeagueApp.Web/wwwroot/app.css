@@ -1532,6 +1532,88 @@ p {
     gap: .35rem;
 }
 
+.roster-admin-shell {
+    margin-bottom: 1rem;
+}
+
+.roster-admin-shell summary {
+    align-items: center;
+    cursor: pointer;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    list-style: none;
+}
+
+.roster-admin-shell summary::-webkit-details-marker {
+    display: none;
+}
+
+.roster-admin-team {
+    border-top: 1px solid #edf2f0;
+    display: grid;
+    gap: .85rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+}
+
+.roster-admin-team__header {
+    align-items: center;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+}
+
+.roster-admin-team__header h2 {
+    font-size: 1.05rem;
+    margin: 0;
+}
+
+.roster-admin-team__header span {
+    color: #60716d;
+}
+
+.roster-form,
+.roster-edit-grid {
+    align-items: end;
+    display: grid;
+    gap: .65rem;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.roster-form label,
+.roster-edit-grid label {
+    color: #40514d;
+    display: grid;
+    font-size: .82rem;
+    font-weight: 800;
+    gap: .3rem;
+}
+
+.roster-admin-list {
+    display: grid;
+    gap: .6rem;
+}
+
+.roster-admin-row {
+    background: #fbfdfc;
+    border: 1px solid #edf2f0;
+    border-radius: 8px;
+    display: grid;
+    gap: .65rem;
+    padding: .7rem;
+}
+
+.roster-admin-row.is-archived {
+    opacity: .72;
+}
+
+.roster-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+}
+
 .club-card {
     align-items: start;
     color: inherit;
@@ -2489,8 +2571,16 @@ p {
     }
 
     .clubs-edit-row,
-    .clubs-edit-row--team {
+    .clubs-edit-row--team,
+    .roster-form,
+    .roster-edit-grid {
         grid-template-columns: 1fr;
+    }
+
+    .roster-admin-shell summary,
+    .roster-admin-team__header {
+        align-items: flex-start;
+        display: grid;
     }
 
     .breadcrumb-trail {
