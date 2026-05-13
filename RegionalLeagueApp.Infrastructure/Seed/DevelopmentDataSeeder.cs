@@ -98,70 +98,244 @@ public sealed class DevelopmentDataSeeder(
     private async Task SeedLeagueDataAsync(CancellationToken cancellationToken)
     {
         const string leagueName = "Liga Regional Norte";
+        const string leagueRegion = "Norte";
+        const string leagueCountry = "Argentina";
+        const string seasonName = "Temporada 2026";
+        const string competitionName = "Primera Division";
 
-        if (await db.Leagues.AnyAsync(x => x.Name == leagueName, cancellationToken))
+        var league = await db.Leagues.FirstOrDefaultAsync(
+            x => x.Name == leagueName && x.Region == leagueRegion,
+            cancellationToken);
+        if (league is null)
         {
-            return;
+            league = new League(leagueName, leagueRegion, leagueCountry);
+            db.Leagues.Add(league);
         }
 
-        var league = new League(leagueName, "Norte", "Argentina");
-        var season = new Season(
-            league.Id,
-            "Temporada 2026",
-            new DateOnly(2026, 3, 1),
-            new DateOnly(2026, 11, 30),
-            isActive: true);
-        var competition = new Competition(season.Id, "Primera Division", "League");
-
-        var rounds = new[]
+        var season = await db.Seasons.FirstOrDefaultAsync(
+            x => x.LeagueId == league.Id && x.Name == seasonName,
+            cancellationToken);
+        if (season is null)
         {
-            new Round(competition.Id, "Fecha 1", 1),
-            new Round(competition.Id, "Fecha 2", 2),
-            new Round(competition.Id, "Fecha 3", 3),
-            new Round(competition.Id, "Fecha 4", 4)
+            season = new Season(
+                league.Id,
+                seasonName,
+                new DateOnly(2026, 3, 1),
+                new DateOnly(2026, 11, 30),
+                isActive: true);
+            db.Seasons.Add(season);
+        }
+
+        var competition = await db.Competitions.FirstOrDefaultAsync(
+            x => x.SeasonId == season.Id && x.Name == competitionName,
+            cancellationToken);
+        if (competition is null)
+        {
+            competition = new Competition(season.Id, competitionName, "League");
+            db.Competitions.Add(competition);
+        }
+
+        var rounds = await EnsureRoundsAsync(competition.Id, cancellationToken);
+        var venues = await EnsureVenuesAsync(cancellationToken);
+        var clubs = await EnsureClubsAsync(venues, cancellationToken);
+        var teams = await EnsureTeamsAsync(clubs, competition.Id, cancellationToken);
+        var players = await EnsurePlayersAsync(teams, cancellationToken);
+        var matches = await EnsureMatchesAsync(competition.Id, rounds, teams, venues, cancellationToken);
+
+        await EnsureMatchEventsAsync(matches, teams, players, cancellationToken);
+        await EnsureStandingsAsync(competition.Id, teams, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<Round[]> EnsureRoundsAsync(Guid competitionId, CancellationToken cancellationToken)
+    {
+        var seedRounds = new[]
+        {
+            (Name: "Fecha 1", SortOrder: 1),
+            (Name: "Fecha 2", SortOrder: 2),
+            (Name: "Fecha 3", SortOrder: 3),
+            (Name: "Fecha 4", SortOrder: 4)
         };
 
-        var venues = new[]
+        var rounds = new List<Round>();
+        foreach (var seed in seedRounds)
         {
-            new Venue("Estadio Municipal", "San Pedro", 4200),
-            new Venue("Cancha del Barrio", "Villa Norte", 1800),
-            new Venue("Parque Central", "Rivadavia", 2600),
-            new Venue("La Fortaleza", "Belgrano", 3100)
+            var round = await db.Rounds.FirstOrDefaultAsync(
+                x => x.CompetitionId == competitionId && x.SortOrder == seed.SortOrder,
+                cancellationToken);
+
+            if (round is null)
+            {
+                round = new Round(competitionId, seed.Name, seed.SortOrder);
+                db.Rounds.Add(round);
+            }
+
+            rounds.Add(round);
+        }
+
+        return rounds.ToArray();
+    }
+
+    private async Task<Venue[]> EnsureVenuesAsync(CancellationToken cancellationToken)
+    {
+        var seedVenues = new[]
+        {
+            (Name: "Estadio Municipal", City: "San Pedro", Capacity: 4200),
+            (Name: "Cancha del Barrio", City: "Villa Norte", Capacity: 1800),
+            (Name: "Parque Central", City: "Rivadavia", Capacity: 2600),
+            (Name: "La Fortaleza", City: "Belgrano", Capacity: 3100)
         };
 
-        var clubSeeds = new[]
+        var venues = new List<Venue>();
+        foreach (var seed in seedVenues)
         {
-            (Club: new Club("Atletico San Pedro", "ASP", "#166534", 1948, venues[0].Id), ShortName: "ASP"),
-            (Club: new Club("Deportivo Norte", "DN", "#1d4ed8", 1972, venues[1].Id), ShortName: "DN"),
-            (Club: new Club("Union Rivadavia", "UR", "#b91c1c", 1965, venues[2].Id), ShortName: "UR"),
-            (Club: new Club("Club Belgrano", "CB", "#7c2d12", 1954, venues[3].Id), ShortName: "CB")
-        };
-        var clubs = clubSeeds.Select(x => x.Club).ToArray();
+            var venue = await db.Venues.FirstOrDefaultAsync(
+                x => x.Name == seed.Name && x.City == seed.City,
+                cancellationToken);
 
-        var teams = clubSeeds
-            .Select(seed => new Team(seed.Club.Id, competition.Id, $"{seed.ShortName} Primera", "Primera"))
-            .ToArray();
+            if (venue is null)
+            {
+                venue = new Venue(seed.Name, seed.City, seed.Capacity);
+                db.Venues.Add(venue);
+            }
 
-        db.AddRange(league, season, competition);
-        db.Rounds.AddRange(rounds);
-        db.Venues.AddRange(venues);
-        db.Clubs.AddRange(clubs);
-        db.Teams.AddRange(teams);
-        var players = CreatePlayers(teams).ToArray();
-        db.Players.AddRange(players);
+            venues.Add(venue);
+        }
 
-        var matches = new[]
+        return venues.ToArray();
+    }
+
+    private async Task<Club[]> EnsureClubsAsync(IReadOnlyList<Venue> venues, CancellationToken cancellationToken)
+    {
+        var seedClubs = new[]
         {
-            new Match(competition.Id, rounds[0].Id, teams[0].Id, teams[1].Id, UtcDateTime(2026, 5, 2, 19, 0), venues[0].Id, MatchStatus.Finished, 2, 1),
-            new Match(competition.Id, rounds[0].Id, teams[2].Id, teams[3].Id, UtcDateTime(2026, 5, 2, 21, 30), venues[2].Id, MatchStatus.Finished, 0, 0),
-            new Match(competition.Id, rounds[1].Id, teams[1].Id, teams[2].Id, UtcDateTime(2026, 5, 9, 19, 0), venues[1].Id),
-            new Match(competition.Id, rounds[1].Id, teams[3].Id, teams[0].Id, UtcDateTime(2026, 5, 9, 21, 30), venues[3].Id),
-            new Match(competition.Id, rounds[2].Id, teams[0].Id, teams[2].Id, UtcDateTime(2026, 5, 16, 19, 0), venues[0].Id),
-            new Match(competition.Id, rounds[2].Id, teams[1].Id, teams[3].Id, UtcDateTime(2026, 5, 16, 21, 30), venues[1].Id)
+            (Name: "Atletico San Pedro", ShortName: "ASP", PrimaryColor: "#166534", FoundedYear: 1948, Venue: venues[0]),
+            (Name: "Deportivo Norte", ShortName: "DN", PrimaryColor: "#1d4ed8", FoundedYear: 1972, Venue: venues[1]),
+            (Name: "Union Rivadavia", ShortName: "UR", PrimaryColor: "#b91c1c", FoundedYear: 1965, Venue: venues[2]),
+            (Name: "Club Belgrano", ShortName: "CB", PrimaryColor: "#7c2d12", FoundedYear: 1954, Venue: venues[3])
         };
 
-        db.Matches.AddRange(matches);
-        db.MatchEvents.AddRange(
+        var clubs = new List<Club>();
+        foreach (var seed in seedClubs)
+        {
+            var club = await db.Clubs.FirstOrDefaultAsync(x => x.Name == seed.Name, cancellationToken);
+            if (club is null)
+            {
+                club = new Club(seed.Name, seed.ShortName, seed.PrimaryColor, seed.FoundedYear, seed.Venue.Id);
+                db.Clubs.Add(club);
+            }
+
+            clubs.Add(club);
+        }
+
+        return clubs.ToArray();
+    }
+
+    private async Task<Team[]> EnsureTeamsAsync(IReadOnlyList<Club> clubs, Guid competitionId, CancellationToken cancellationToken)
+    {
+        var teams = new List<Team>();
+        foreach (var club in clubs)
+        {
+            var teamName = $"{club.ShortName} Primera";
+            var team = await db.Teams.FirstOrDefaultAsync(
+                x => x.CompetitionId == competitionId && x.ClubId == club.Id,
+                cancellationToken);
+
+            if (team is null)
+            {
+                team = new Team(club.Id, competitionId, teamName, "Primera");
+                db.Teams.Add(team);
+            }
+
+            teams.Add(team);
+        }
+
+        return teams.ToArray();
+    }
+
+    private async Task<Player[]> EnsurePlayersAsync(IReadOnlyList<Team> teams, CancellationToken cancellationToken)
+    {
+        var players = new List<Player>();
+        foreach (var team in teams)
+        {
+            var existingPlayers = await db.Players
+                .Where(x => x.TeamId == team.Id)
+                .ToListAsync(cancellationToken);
+
+            foreach (var seedPlayer in CreatePlayers([team]))
+            {
+                var player = existingPlayers.FirstOrDefault(x => x.ShirtNumber == seedPlayer.ShirtNumber);
+                if (player is null)
+                {
+                    player = seedPlayer;
+                    db.Players.Add(player);
+                    existingPlayers.Add(player);
+                }
+
+                players.Add(player);
+            }
+        }
+
+        return players.ToArray();
+    }
+
+    private async Task<Match[]> EnsureMatchesAsync(
+        Guid competitionId,
+        IReadOnlyList<Round> rounds,
+        IReadOnlyList<Team> teams,
+        IReadOnlyList<Venue> venues,
+        CancellationToken cancellationToken)
+    {
+        var seedMatches = new[]
+        {
+            (Round: rounds[0], Home: teams[0], Away: teams[1], StartsAt: UtcDateTime(2026, 5, 2, 19, 0), Venue: venues[0], Status: MatchStatus.Finished, HomeScore: (int?)2, AwayScore: (int?)1),
+            (Round: rounds[0], Home: teams[2], Away: teams[3], StartsAt: UtcDateTime(2026, 5, 2, 21, 30), Venue: venues[2], Status: MatchStatus.Finished, HomeScore: (int?)0, AwayScore: (int?)0),
+            (Round: rounds[1], Home: teams[1], Away: teams[2], StartsAt: UtcDateTime(2026, 5, 9, 19, 0), Venue: venues[1], Status: MatchStatus.Scheduled, HomeScore: (int?)null, AwayScore: (int?)null),
+            (Round: rounds[1], Home: teams[3], Away: teams[0], StartsAt: UtcDateTime(2026, 5, 9, 21, 30), Venue: venues[3], Status: MatchStatus.Scheduled, HomeScore: (int?)null, AwayScore: (int?)null),
+            (Round: rounds[2], Home: teams[0], Away: teams[2], StartsAt: UtcDateTime(2026, 5, 16, 19, 0), Venue: venues[0], Status: MatchStatus.Scheduled, HomeScore: (int?)null, AwayScore: (int?)null),
+            (Round: rounds[2], Home: teams[1], Away: teams[3], StartsAt: UtcDateTime(2026, 5, 16, 21, 30), Venue: venues[1], Status: MatchStatus.Scheduled, HomeScore: (int?)null, AwayScore: (int?)null)
+        };
+
+        var matches = new List<Match>();
+        foreach (var seed in seedMatches)
+        {
+            var match = await db.Matches.FirstOrDefaultAsync(
+                x => x.CompetitionId == competitionId
+                    && x.RoundId == seed.Round.Id
+                    && x.HomeTeamId == seed.Home.Id
+                    && x.AwayTeamId == seed.Away.Id
+                    && x.StartsAt == seed.StartsAt,
+                cancellationToken);
+
+            if (match is null)
+            {
+                match = new Match(
+                    competitionId,
+                    seed.Round.Id,
+                    seed.Home.Id,
+                    seed.Away.Id,
+                    seed.StartsAt,
+                    seed.Venue.Id,
+                    seed.Status,
+                    seed.HomeScore,
+                    seed.AwayScore);
+                db.Matches.Add(match);
+            }
+
+            matches.Add(match);
+        }
+
+        return matches.ToArray();
+    }
+
+    private async Task EnsureMatchEventsAsync(
+        IReadOnlyList<Match> matches,
+        IReadOnlyList<Team> teams,
+        IReadOnlyCollection<Player> players,
+        CancellationToken cancellationToken)
+    {
+        var seedEvents = new[]
+        {
             new MatchEvent(matches[0].Id, MatchEventType.KickOff, 0),
             SeedEvent(matches[0].Id, MatchEventType.Goal, 22, teams[0].Id, players, "Opening goal"),
             SeedEvent(matches[0].Id, MatchEventType.Goal, 61, teams[1].Id, players, "Equalizer"),
@@ -169,15 +343,56 @@ public sealed class DevelopmentDataSeeder(
             new MatchEvent(matches[0].Id, MatchEventType.FullTime, 90),
             new MatchEvent(matches[1].Id, MatchEventType.KickOff, 0),
             SeedEvent(matches[1].Id, MatchEventType.YellowCard, 34, teams[2].Id, players),
-            new MatchEvent(matches[1].Id, MatchEventType.FullTime, 90));
+            new MatchEvent(matches[1].Id, MatchEventType.FullTime, 90)
+        };
 
-        db.Standings.AddRange(
-            new Standing(competition.Id, teams[0].Id, played: 1, won: 1, drawn: 0, lost: 0, goalsFor: 2, goalsAgainst: 1, points: 3),
-            new Standing(competition.Id, teams[3].Id, played: 1, won: 0, drawn: 1, lost: 0, goalsFor: 0, goalsAgainst: 0, points: 1),
-            new Standing(competition.Id, teams[2].Id, played: 1, won: 0, drawn: 1, lost: 0, goalsFor: 0, goalsAgainst: 0, points: 1),
-            new Standing(competition.Id, teams[1].Id, played: 1, won: 0, drawn: 0, lost: 1, goalsFor: 1, goalsAgainst: 2, points: 0));
+        foreach (var seedEvent in seedEvents)
+        {
+            var exists = await db.MatchEvents.AnyAsync(
+                x => x.MatchId == seedEvent.MatchId
+                    && x.Type == seedEvent.Type
+                    && x.Minute == seedEvent.Minute
+                    && x.TeamId == seedEvent.TeamId
+                    && x.PlayerId == seedEvent.PlayerId,
+                cancellationToken);
 
-        await db.SaveChangesAsync(cancellationToken);
+            if (!exists)
+            {
+                db.MatchEvents.Add(seedEvent);
+            }
+        }
+    }
+
+    private async Task EnsureStandingsAsync(Guid competitionId, IReadOnlyList<Team> teams, CancellationToken cancellationToken)
+    {
+        var seedStandings = new[]
+        {
+            (Team: teams[0], Played: 1, Won: 1, Drawn: 0, Lost: 0, GoalsFor: 2, GoalsAgainst: 1, Points: 3),
+            (Team: teams[3], Played: 1, Won: 0, Drawn: 1, Lost: 0, GoalsFor: 0, GoalsAgainst: 0, Points: 1),
+            (Team: teams[2], Played: 1, Won: 0, Drawn: 1, Lost: 0, GoalsFor: 0, GoalsAgainst: 0, Points: 1),
+            (Team: teams[1], Played: 1, Won: 0, Drawn: 0, Lost: 1, GoalsFor: 1, GoalsAgainst: 2, Points: 0)
+        };
+
+        foreach (var seed in seedStandings)
+        {
+            var exists = await db.Standings.AnyAsync(
+                x => x.CompetitionId == competitionId && x.TeamId == seed.Team.Id,
+                cancellationToken);
+
+            if (!exists)
+            {
+                db.Standings.Add(new Standing(
+                    competitionId,
+                    seed.Team.Id,
+                    seed.Played,
+                    seed.Won,
+                    seed.Drawn,
+                    seed.Lost,
+                    seed.GoalsFor,
+                    seed.GoalsAgainst,
+                    seed.Points));
+            }
+        }
     }
 
     private async Task SeedCollaborationUsersAsync(CancellationToken cancellationToken)

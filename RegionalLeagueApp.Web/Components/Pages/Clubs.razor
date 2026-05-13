@@ -1,17 +1,202 @@
 @page "/clubs"
+@rendermode InteractiveServer
 @using Microsoft.EntityFrameworkCore
 @inject ApplicationDbContext Db
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Clubes</PageTitle>
 
 <div class="page-heading">
     <p class="eyebrow">Clubes</p>
-    <h1>Clubes participantes</h1>
+    <h1>@PageTitleText</h1>
 </div>
+
+@if (!string.IsNullOrWhiteSpace(statusMessage))
+{
+    <div class="leagues-message @(isSuccessMessage ? "leagues-message--success" : "leagues-message--error")">
+        @statusMessage
+    </div>
+}
+
+@if (canManageClubs)
+{
+    <details class="panel clubs-admin-shell">
+        <summary>
+            <span>
+                <small class="eyebrow">Administracion</small>
+                <strong>Crear club</strong>
+            </span>
+            <span class="clubs-admin-shell__hint">Admin / Moderator</span>
+        </summary>
+
+        <div class="clubs-form">
+            <label>
+                Nombre
+                <input class="form-control" value="@newClubName" @oninput="eventArgs => newClubName = eventArgs.Value?.ToString() ?? string.Empty" maxlength="150" />
+            </label>
+            <label>
+                Nombre corto
+                <input class="form-control" value="@newClubShortName" @oninput="eventArgs => newClubShortName = eventArgs.Value?.ToString() ?? string.Empty" maxlength="30" />
+            </label>
+            <label>
+                Sede
+                <input class="form-control" value="@newVenueName" @oninput="eventArgs => newVenueName = eventArgs.Value?.ToString() ?? string.Empty" maxlength="150" />
+            </label>
+            <label>
+                Ciudad
+                <input class="form-control" value="@newVenueCity" @oninput="eventArgs => newVenueCity = eventArgs.Value?.ToString() ?? string.Empty" maxlength="120" />
+            </label>
+            <label>
+                Año de fundación
+                <input class="form-control" value="@newFoundedYear" @oninput="eventArgs => newFoundedYear = eventArgs.Value?.ToString() ?? string.Empty" inputmode="numeric" pattern="[0-9]{4}" placeholder="1922" maxlength="4" />
+            </label>
+            <label>
+                Color primario
+                <input class="form-control" value="@newPrimaryColor" @oninput="eventArgs => newPrimaryColor = eventArgs.Value?.ToString() ?? string.Empty" placeholder="#166534" maxlength="20" />
+            </label>
+            <button type="button" class="leagues-button" disabled="@isSaving" @onclick="CreateClubAsync">
+                @(isSaving ? "Guardando..." : "Crear club")
+            </button>
+        </div>
+    </details>
+
+    <details class="panel clubs-admin-shell">
+        <summary>
+            <span>
+                <small class="eyebrow">Administracion</small>
+                <strong>Editar clubes y equipos</strong>
+            </span>
+            <span class="clubs-admin-shell__hint">@teamRows.Count equipo(s)</span>
+        </summary>
+
+        <section class="clubs-admin-block">
+            <h2>Clubes</h2>
+            <div class="clubs-edit-list">
+                @foreach (var club in clubs)
+                {
+                    var edit = GetClubEditModel(club.Id);
+                    <div class="clubs-edit-row">
+                        <label>
+                            Nombre
+                            <input class="form-control" value="@edit.Name" @oninput="eventArgs => edit.Name = eventArgs.Value?.ToString() ?? string.Empty" maxlength="150" />
+                        </label>
+                        <label>
+                            Corto
+                            <input class="form-control" value="@edit.ShortName" @oninput="eventArgs => edit.ShortName = eventArgs.Value?.ToString() ?? string.Empty" maxlength="30" />
+                        </label>
+                        <label>
+                            Sede
+                            <input class="form-control" value="@edit.VenueName" @oninput="eventArgs => edit.VenueName = eventArgs.Value?.ToString() ?? string.Empty" maxlength="150" />
+                        </label>
+                        <label>
+                            Ciudad
+                            <input class="form-control" value="@edit.VenueCity" @oninput="eventArgs => edit.VenueCity = eventArgs.Value?.ToString() ?? string.Empty" maxlength="120" />
+                        </label>
+                        <label>
+                            Año
+                            <input class="form-control" value="@edit.FoundedYear" @oninput="eventArgs => edit.FoundedYear = eventArgs.Value?.ToString() ?? string.Empty" inputmode="numeric" placeholder="1922" maxlength="4" />
+                        </label>
+                        <label>
+                            Color
+                            <input class="form-control" value="@edit.PrimaryColor" @oninput="eventArgs => edit.PrimaryColor = eventArgs.Value?.ToString() ?? string.Empty" maxlength="20" />
+                        </label>
+                        <label class="checkbox-line">
+                            <input type="checkbox" checked="@edit.IsActive" @onchange="eventArgs => edit.IsActive = eventArgs.Value is true" />
+                            Activo
+                        </label>
+                        <button type="button" class="leagues-button leagues-button--muted" disabled="@isSaving" @onclick="() => UpdateClubAsync(club.Id)">Guardar</button>
+                    </div>
+                }
+            </div>
+        </section>
+
+        <section class="clubs-admin-block">
+            <h2>Crear equipo</h2>
+            <div class="clubs-form">
+                <label>
+                    Nombre
+                    <input class="form-control" value="@newTeamName" @oninput="eventArgs => newTeamName = eventArgs.Value?.ToString() ?? string.Empty" maxlength="150" />
+                </label>
+                <label>
+                    Categoria
+                    <input class="form-control" value="@newTeamCategory" @oninput="eventArgs => newTeamCategory = eventArgs.Value?.ToString() ?? string.Empty" maxlength="60" />
+                </label>
+                <label>
+                    Club
+                    <select class="form-control" @bind="newTeamClubId">
+                        <option value="">Seleccionar</option>
+                        @foreach (var club in clubOptions)
+                        {
+                            <option value="@club.Id">@club.Name</option>
+                        }
+                    </select>
+                </label>
+                <label>
+                    Competencia
+                    <select class="form-control" @bind="newTeamCompetitionId">
+                        <option value="">Seleccionar</option>
+                        @foreach (var competition in competitionOptions)
+                        {
+                            <option value="@competition.Id">@competition.Label</option>
+                        }
+                    </select>
+                </label>
+                <button type="button" class="leagues-button" disabled="@isSaving" @onclick="CreateTeamAsync">Crear equipo</button>
+            </div>
+
+            @if (teamRows.Count == 0)
+            {
+                <EmptyState Text="No hay equipos cargados." />
+            }
+            else
+            {
+                <div class="clubs-edit-list">
+                    @foreach (var team in teamRows)
+                    {
+                        var edit = GetTeamEditModel(team.Id);
+                        <div class="clubs-edit-row clubs-edit-row--team">
+                            <label>
+                                Nombre
+                                <input class="form-control" value="@edit.Name" @oninput="eventArgs => edit.Name = eventArgs.Value?.ToString() ?? string.Empty" maxlength="150" />
+                            </label>
+                            <label>
+                                Categoria
+                                <input class="form-control" value="@edit.Category" @oninput="eventArgs => edit.Category = eventArgs.Value?.ToString() ?? string.Empty" maxlength="60" />
+                            </label>
+                            <label>
+                                Club
+                                <select class="form-control" @bind="edit.ClubId">
+                                    @foreach (var club in clubOptions)
+                                    {
+                                        <option value="@club.Id">@club.Name</option>
+                                    }
+                                </select>
+                            </label>
+                            <label>
+                                Competencia
+                                <select class="form-control" @bind="edit.CompetitionId">
+                                    @foreach (var competition in competitionOptions)
+                                    {
+                                        <option value="@competition.Id">@competition.Label</option>
+                                    }
+                                </select>
+                            </label>
+                            <label class="checkbox-line">
+                                <input type="checkbox" checked="@edit.IsActive" @onchange="eventArgs => edit.IsActive = eventArgs.Value is true" />
+                                Activo
+                            </label>
+                            <button type="button" class="leagues-button leagues-button--muted" disabled="@isSaving" @onclick="() => UpdateTeamAsync(team.Id)">Guardar</button>
+                        </div>
+                    }
+                </div>
+            }
+        </section>
+    </details>
+}
 
 @if (clubs.Count == 0)
 {
-    <EmptyState Text="No hay clubes cargados." />
+    <EmptyState Text="@EmptyText" />
 }
 else
 {
@@ -22,6 +207,10 @@ else
                 <ClubLogo Name="@club.Name" LogoPath="@club.LogoPath" />
                 <strong>@club.Name</strong>
                 <small>@club.Venue?.Name - @club.Venue?.City</small>
+                @if (!club.IsActive)
+                {
+                    <small class="leagues-pill">Archivado</small>
+                }
             </a>
         }
     </section>
@@ -29,13 +218,468 @@ else
 
 @code {
     private List<Club> clubs = [];
+    private List<TeamAdminRow> teamRows = [];
+    private List<ClubOption> clubOptions = [];
+    private List<CompetitionOption> competitionOptions = [];
+    private readonly Dictionary<Guid, ClubEditModel> clubEditModels = [];
+    private readonly Dictionary<Guid, TeamEditModel> teamEditModels = [];
+    private bool canManageClubs;
+    private bool isSaving;
+    private bool isSuccessMessage;
+    private string? statusMessage;
+    private string? leagueName;
+    private string newClubName = string.Empty;
+    private string newClubShortName = string.Empty;
+    private string newVenueName = string.Empty;
+    private string newVenueCity = string.Empty;
+    private string newFoundedYear = string.Empty;
+    private string newPrimaryColor = string.Empty;
+    private string newTeamName = string.Empty;
+    private string newTeamCategory = "Primera";
+    private Guid? newTeamClubId;
+    private Guid? newTeamCompetitionId;
+
+    [SupplyParameterFromQuery] public Guid? LeagueId { get; set; }
+
+    private string PageTitleText => string.IsNullOrWhiteSpace(leagueName)
+        ? "Clubes participantes"
+        : $"Clubes - {leagueName}";
+
+    private string EmptyText => LeagueId is null
+        ? "No hay clubes cargados."
+        : "No hay clubes asociados a esta liga.";
 
     protected override async Task OnInitializedAsync()
     {
-        clubs = await Db.Clubs
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        canManageClubs = authState.User.IsInRole(AppRoles.Admin) || authState.User.IsInRole(AppRoles.Moderator);
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        leagueName = LeagueId is null
+            ? null
+            : await Db.Leagues
+                .AsNoTracking()
+                .Where(x => x.Id == LeagueId)
+                .Select(x => x.Name)
+                .FirstOrDefaultAsync();
+
+        var query = Db.Clubs
             .AsNoTracking()
             .Include(x => x.Venue)
+            .AsQueryable();
+
+        if (!canManageClubs)
+        {
+            query = query.Where(x => x.IsActive);
+        }
+
+        if (LeagueId is not null)
+        {
+            query = query.Where(x => x.Teams.Any(team => team.IsActive && team.Competition!.IsActive && team.Competition.Season!.LeagueId == LeagueId));
+        }
+
+        clubs = await query
             .OrderBy(x => x.Name)
             .ToListAsync();
+
+        await LoadAdminOptionsAsync();
+        PrepareClubEditModels();
+        PrepareTeamEditModels();
+    }
+
+    private async Task LoadAdminOptionsAsync()
+    {
+        if (!canManageClubs)
+        {
+            return;
+        }
+
+        clubOptions = await Db.Clubs
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .OrderBy(x => x.Name)
+            .Select(x => new ClubOption(x.Id, x.Name))
+            .ToListAsync();
+
+        competitionOptions = await Db.Competitions
+            .AsNoTracking()
+            .Include(x => x.Season)!.ThenInclude(x => x!.League)
+            .Where(x => x.IsActive && x.Season!.League!.IsActive)
+            .OrderBy(x => x.Season!.League!.Name)
+            .ThenBy(x => x.Name)
+            .Select(x => new CompetitionOption(x.Id, $"{x.Season!.League!.Name} - {x.Name}"))
+            .ToListAsync();
+
+        teamRows = await Db.Teams
+            .AsNoTracking()
+            .Include(x => x.Club)
+            .Include(x => x.Competition)!.ThenInclude(x => x!.Season)!.ThenInclude(x => x!.League)
+            .Where(x => LeagueId == null || x.Competition!.Season!.LeagueId == LeagueId)
+            .OrderBy(x => x.Club!.Name)
+            .ThenBy(x => x.Category)
+            .Select(x => new TeamAdminRow(
+                x.Id,
+                x.Name,
+                x.Category,
+                x.ClubId,
+                x.Club!.Name,
+                x.CompetitionId,
+                x.Competition!.Name,
+                x.IsActive))
+            .ToListAsync();
+    }
+
+    private async Task CreateClubAsync()
+    {
+        if (!canManageClubs)
+        {
+            SetMessage("No tenes permisos para crear clubes.", false);
+            return;
+        }
+
+        var name = newClubName.Trim();
+        var shortName = newClubShortName.Trim();
+        var venueName = newVenueName.Trim();
+        var venueCity = newVenueCity.Trim();
+        var primaryColor = string.IsNullOrWhiteSpace(newPrimaryColor) ? null : newPrimaryColor.Trim();
+
+        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(shortName))
+        {
+            SetMessage("Nombre y nombre corto son obligatorios.", false);
+            return;
+        }
+
+        if (name.Length > 150 || shortName.Length > 30)
+        {
+            SetMessage("Nombre o nombre corto superan la longitud permitida.", false);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(venueName) != string.IsNullOrWhiteSpace(venueCity))
+        {
+            SetMessage("Para crear una sede, completa nombre de sede y ciudad.", false);
+            return;
+        }
+
+        int? foundedYear = null;
+        if (!string.IsNullOrWhiteSpace(newFoundedYear))
+        {
+            if (!int.TryParse(newFoundedYear.Trim(), out var parsedYear) || parsedYear < 1800 || parsedYear > DateTime.UtcNow.Year)
+            {
+                SetMessage("Ingresa solo el año de fundación, por ejemplo 1922. No uses una fecha completa.", false);
+                return;
+            }
+
+            foundedYear = parsedYear;
+        }
+
+        if (await Db.Clubs.AnyAsync(x => x.Name == name || x.ShortName == shortName))
+        {
+            SetMessage("Ya existe un club con ese nombre o nombre corto.", false);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            Guid? venueId = null;
+            if (!string.IsNullOrWhiteSpace(venueName) && !string.IsNullOrWhiteSpace(venueCity))
+            {
+                var venue = await Db.Venues.FirstOrDefaultAsync(x => x.Name == venueName && x.City == venueCity);
+                if (venue is null)
+                {
+                    venue = new Venue(venueName, venueCity);
+                    Db.Venues.Add(venue);
+                }
+
+                venueId = venue.Id;
+            }
+
+            Db.Clubs.Add(new Club(name, shortName, primaryColor, foundedYear, venueId));
+            await Db.SaveChangesAsync();
+
+            newClubName = string.Empty;
+            newClubShortName = string.Empty;
+            newVenueName = string.Empty;
+            newVenueCity = string.Empty;
+            newFoundedYear = string.Empty;
+            newPrimaryColor = string.Empty;
+            SetMessage("Club creado correctamente.", true);
+            await LoadAsync();
+        }
+        catch (DbUpdateException)
+        {
+            SetMessage("No se pudo crear el club. Revisa que no este duplicado.", false);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task UpdateClubAsync(Guid clubId)
+    {
+        if (!canManageClubs || isSaving)
+        {
+            return;
+        }
+
+        var edit = GetClubEditModel(clubId);
+        var name = edit.Name.Trim();
+        var shortName = edit.ShortName.Trim();
+        var venueName = edit.VenueName.Trim();
+        var venueCity = edit.VenueCity.Trim();
+        var primaryColor = string.IsNullOrWhiteSpace(edit.PrimaryColor) ? null : edit.PrimaryColor.Trim();
+
+        if (!ValidateClubInput(name, shortName, venueName, venueCity, edit.FoundedYear, out var foundedYear, out var error))
+        {
+            SetMessage(error, false);
+            return;
+        }
+
+        if (await Db.Clubs.AnyAsync(x => x.Id != clubId && (x.Name == name || x.ShortName == shortName)))
+        {
+            SetMessage("Ya existe otro club con ese nombre o nombre corto.", false);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            var club = await Db.Clubs.FirstOrDefaultAsync(x => x.Id == clubId);
+            if (club is null)
+            {
+                SetMessage("Club no encontrado.", false);
+                return;
+            }
+
+            var venueId = await ResolveVenueIdAsync(venueName, venueCity);
+            club.UpdateDetails(name, shortName, primaryColor, foundedYear, venueId);
+            club.SetActive(edit.IsActive);
+            await Db.SaveChangesAsync();
+            SetMessage("Club actualizado correctamente.", true);
+            await LoadAsync();
+        }
+        catch (DbUpdateException)
+        {
+            SetMessage("No se pudo actualizar el club.", false);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task CreateTeamAsync()
+    {
+        if (!canManageClubs || isSaving)
+        {
+            return;
+        }
+
+        var name = newTeamName.Trim();
+        var category = newTeamCategory.Trim();
+        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(category) || newTeamClubId is null || newTeamCompetitionId is null)
+        {
+            SetMessage("Nombre, categoria, club y competencia son obligatorios.", false);
+            return;
+        }
+
+        if (await Db.Teams.AnyAsync(x => x.CompetitionId == newTeamCompetitionId && (x.ClubId == newTeamClubId || x.Name == name)))
+        {
+            SetMessage("Ese club o nombre de equipo ya existe en la competencia.", false);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            Db.Teams.Add(new Team(newTeamClubId.Value, newTeamCompetitionId.Value, name, category));
+            await Db.SaveChangesAsync();
+            newTeamName = string.Empty;
+            newTeamCategory = "Primera";
+            newTeamClubId = null;
+            newTeamCompetitionId = null;
+            SetMessage("Equipo creado y asociado a la competencia.", true);
+            await LoadAsync();
+        }
+        catch (DbUpdateException)
+        {
+            SetMessage("No se pudo crear el equipo.", false);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task UpdateTeamAsync(Guid teamId)
+    {
+        if (!canManageClubs || isSaving)
+        {
+            return;
+        }
+
+        var edit = GetTeamEditModel(teamId);
+        var name = edit.Name.Trim();
+        var category = edit.Category.Trim();
+        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(category))
+        {
+            SetMessage("Nombre y categoria del equipo son obligatorios.", false);
+            return;
+        }
+
+        if (await Db.Teams.AnyAsync(x => x.Id != teamId && x.CompetitionId == edit.CompetitionId && (x.ClubId == edit.ClubId || x.Name == name)))
+        {
+            SetMessage("Ese club o nombre de equipo ya existe en la competencia.", false);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            var team = await Db.Teams.FirstOrDefaultAsync(x => x.Id == teamId);
+            if (team is null)
+            {
+                SetMessage("Equipo no encontrado.", false);
+                return;
+            }
+
+            team.UpdateDetails(edit.ClubId, edit.CompetitionId, name, category);
+            team.SetActive(edit.IsActive);
+            await Db.SaveChangesAsync();
+            SetMessage("Equipo actualizado correctamente.", true);
+            await LoadAsync();
+        }
+        catch (DbUpdateException)
+        {
+            SetMessage("No se pudo actualizar el equipo.", false);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task<Guid?> ResolveVenueIdAsync(string venueName, string venueCity)
+    {
+        if (string.IsNullOrWhiteSpace(venueName) && string.IsNullOrWhiteSpace(venueCity))
+        {
+            return null;
+        }
+
+        var venue = await Db.Venues.FirstOrDefaultAsync(x => x.Name == venueName && x.City == venueCity);
+        if (venue is null)
+        {
+            venue = new Venue(venueName, venueCity);
+            Db.Venues.Add(venue);
+        }
+
+        return venue.Id;
+    }
+
+    private static bool ValidateClubInput(string name, string shortName, string venueName, string venueCity, string foundedYearText, out int? foundedYear, out string error)
+    {
+        foundedYear = null;
+        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(shortName))
+        {
+            error = "Nombre y nombre corto son obligatorios.";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(venueName) != string.IsNullOrWhiteSpace(venueCity))
+        {
+            error = "Para crear una sede, completa nombre de sede y ciudad.";
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(foundedYearText))
+        {
+            if (!int.TryParse(foundedYearText.Trim(), out var parsedYear) || parsedYear < 1800 || parsedYear > DateTime.UtcNow.Year)
+            {
+                error = "Ingresa solo el año de fundación, por ejemplo 1922. No uses una fecha completa.";
+                return false;
+            }
+
+            foundedYear = parsedYear;
+        }
+
+        error = string.Empty;
+        return true;
+    }
+
+    private void PrepareClubEditModels()
+    {
+        clubEditModels.Clear();
+        foreach (var club in clubs)
+        {
+            clubEditModels[club.Id] = new ClubEditModel
+            {
+                Name = club.Name,
+                ShortName = club.ShortName,
+                VenueName = club.Venue?.Name ?? string.Empty,
+                VenueCity = club.Venue?.City ?? string.Empty,
+                FoundedYear = club.FoundedYear?.ToString() ?? string.Empty,
+                PrimaryColor = club.PrimaryColor ?? string.Empty,
+                IsActive = club.IsActive
+            };
+        }
+    }
+
+    private void PrepareTeamEditModels()
+    {
+        teamEditModels.Clear();
+        foreach (var team in teamRows)
+        {
+            teamEditModels[team.Id] = new TeamEditModel
+            {
+                Name = team.Name,
+                Category = team.Category,
+                ClubId = team.ClubId,
+                CompetitionId = team.CompetitionId,
+                IsActive = team.IsActive
+            };
+        }
+    }
+
+    private ClubEditModel GetClubEditModel(Guid clubId) => clubEditModels.TryGetValue(clubId, out var edit) ? edit : new ClubEditModel();
+
+    private TeamEditModel GetTeamEditModel(Guid teamId) => teamEditModels.TryGetValue(teamId, out var edit) ? edit : new TeamEditModel();
+
+    private void SetMessage(string message, bool success)
+    {
+        statusMessage = message;
+        isSuccessMessage = success;
+    }
+
+    private sealed record ClubOption(Guid Id, string Name);
+    private sealed record CompetitionOption(Guid Id, string Label);
+    private sealed record TeamAdminRow(Guid Id, string Name, string Category, Guid ClubId, string ClubName, Guid CompetitionId, string CompetitionName, bool IsActive);
+
+    private sealed class ClubEditModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public string ShortName { get; set; } = string.Empty;
+        public string VenueName { get; set; } = string.Empty;
+        public string VenueCity { get; set; } = string.Empty;
+        public string FoundedYear { get; set; } = string.Empty;
+        public string PrimaryColor { get; set; } = string.Empty;
+        public bool IsActive { get; set; } = true;
+    }
+
+    private sealed class TeamEditModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public Guid ClubId { get; set; }
+        public Guid CompetitionId { get; set; }
+        public bool IsActive { get; set; } = true;
     }
 }

@@ -15,6 +15,8 @@
 }
 else
 {
+    <PageBreadcrumb BackHref="@MatchBackHref" ParentHref="@MatchBackHref" ParentLabel="@MatchParentLabel" CurrentLabel="@MatchTitle(match)" />
+
     <section class="match-center-hero">
         <div class="match-center-topbar">
             <div class="match-center-meta">
@@ -192,6 +194,12 @@ else
     private bool CanEditMatch => match is not null && access.CanManageMatch(match.HomeTeamId, match.AwayTeamId);
 
     private string EditMatchUrl => $"/admin?matchId={Id}";
+
+    private string MatchBackHref => match?.Status == MatchStatus.Finished ? "/results" : "/fixture";
+
+    private string MatchParentLabel => match?.Status == MatchStatus.Finished ? "Resultados" : "Fixture";
+
+    private static string MatchTitle(Match item) => $"{HomeClubName(item)} vs {AwayClubName(item)}";
 
     private static string ScoreText(Match item) =>
         item.HomeScore is null || item.AwayScore is null ? "vs" : $"{item.HomeScore}-{item.AwayScore}";

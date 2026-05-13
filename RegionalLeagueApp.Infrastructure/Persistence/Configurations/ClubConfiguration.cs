@@ -14,6 +14,8 @@ public sealed class ClubConfiguration : IEntityTypeConfiguration<Club>
         builder.Property(x => x.ShortName).HasMaxLength(30).IsRequired();
         builder.Property(x => x.PrimaryColor).HasMaxLength(20);
         builder.Property(x => x.LogoPath).HasMaxLength(300);
+        builder.Property(x => x.IsActive).IsRequired();
+        builder.Property(x => x.ArchivedAt);
         builder.HasIndex(x => x.Name).IsUnique();
         builder.HasIndex(x => x.ShortName).IsUnique();
 

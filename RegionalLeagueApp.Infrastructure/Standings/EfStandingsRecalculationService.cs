@@ -15,7 +15,7 @@ public sealed class EfStandingsRecalculationService(
             .Where(row => row.CompetitionId == competitionId)
             .ExecuteDeleteAsync(cancellationToken);
 
-        var rows = await standingsQueryService.GetStandingsAsync(cancellationToken);
+        var rows = await standingsQueryService.GetStandingsAsync(cancellationToken: cancellationToken);
         var competitionRows = rows
             .Where(row => row.CompetitionId == competitionId)
             .Select(row => new Standing(

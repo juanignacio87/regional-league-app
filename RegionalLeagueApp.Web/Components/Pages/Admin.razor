@@ -42,6 +42,18 @@
     }
 </section>
 
+@if (access.CanModerate)
+{
+    <section class="panel admin-league-entry">
+        <div>
+            <p class="eyebrow">Estructura deportiva</p>
+            <h2>Ligas, temporadas y competencias</h2>
+            <span>Usa el contexto administrativo de cada liga para crear temporadas, competencias, equipos y partidos.</span>
+        </div>
+        <a class="leagues-button leagues-button--muted" href="/leagues">Gestionar ligas</a>
+    </section>
+}
+
 @if (!string.IsNullOrWhiteSpace(successMessage))
 {
     <div class="alert alert-success admin-feedback" role="status" aria-live="polite">@successMessage</div>
@@ -314,6 +326,8 @@ else
                                 @if (eventPlayers.Count == 0)
                                 {
                                     <p class="admin-empty-hint">No hay jugadores activos cargados para este equipo.</p>
+                                    <InputText id="event-player" class="form-control" @bind-Value="eventForm.PlayerName" placeholder="Nombre del jugador" />
+                                    <ValidationMessage For="() => eventForm.PlayerName" />
                                 }
                                 else
                                 {
@@ -748,6 +762,18 @@ else
             return;
         }
 
+        var match = await Db.Matches
+            .AsNoTracking()
+            .Include(x => x.HomeTeam)
+            .Include(x => x.AwayTeam)
+            .FirstOrDefaultAsync(x => x.Id == editing.MatchId);
+
+        errorMessage = ValidateMatchEventOperation(match, eventForm);
+        if (errorMessage is not null)
+        {
+            return;
+        }
+
         isSavingEvent = true;
         try
         {
@@ -763,7 +789,7 @@ else
                     eventForm.EventType,
                     eventForm.Minute,
                     eventForm.TeamId,
-                    eventForm.PlayerId!.Value,
+                    eventForm.PlayerId,
                     eventForm.PlayerName.Trim());
 
                 Db.MatchUpdateProposals.Add(MatchUpdateProposal.ForMatchEvent(
@@ -1039,9 +1065,9 @@ else
 
     private static string? Validate(EventCreateModel model, MatchEditModel match)
     {
-        if (model.PlayerId is null || string.IsNullOrWhiteSpace(model.PlayerName))
+        if (string.IsNullOrWhiteSpace(model.PlayerName))
         {
-            return "Selecciona un jugador del plantel.";
+            return "Indica el jugador del evento.";
         }
 
         if (model.Minute is < 0 or > 130)
@@ -1057,6 +1083,26 @@ else
         if (!AllowedEventTypes.Contains(model.EventType))
         {
             return "El tipo de evento seleccionado no esta permitido.";
+        }
+
+        return null;
+    }
+
+    private static string? ValidateMatchEventOperation(Match? match, EventCreateModel model)
+    {
+        if (match is null)
+        {
+            return "No se encontro el partido seleccionado.";
+        }
+
+        if (match.HomeTeam is null || match.AwayTeam is null || !match.HomeTeam.IsActive || !match.AwayTeam.IsActive)
+        {
+            return "No se pueden cargar eventos en partidos con equipos archivados.";
+        }
+
+        if (model.EventType == MatchEventType.Goal && match.Status is MatchStatus.Cancelled or MatchStatus.Suspended or MatchStatus.Postponed)
+        {
+            return "No se pueden cargar goles en partidos cancelados, suspendidos o postergados.";
         }
 
         return null;
@@ -1175,7 +1221,6 @@ else
         [Required(ErrorMessage = "El nombre del jugador es obligatorio.")]
         public string PlayerName { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "Selecciona un jugador del plantel.")]
         public Guid? PlayerId { get; set; }
 
         [Range(0, 130, ErrorMessage = "El minuto debe estar entre 0 y 130.")]

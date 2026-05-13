@@ -9,7 +9,7 @@ public sealed record MatchEventAddProposalPayload(
     MatchEventType EventType,
     int Minute,
     Guid TeamId,
-    Guid PlayerId,
+    Guid? PlayerId,
     string PlayerName);
 
 public sealed record MatchEventDeleteProposalPayload(

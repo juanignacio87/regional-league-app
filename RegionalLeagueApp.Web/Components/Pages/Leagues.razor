@@ -21,35 +21,6 @@
     </div>
 }
 
-@if (canManageLeagues)
-{
-    <section class="panel leagues-admin">
-        <div>
-            <p class="eyebrow">Administracion</p>
-            <h2>Crear liga</h2>
-            <p>Disponible para Admin y Moderator. La gestion avanzada queda para fases posteriores.</p>
-        </div>
-
-        <div class="leagues-form">
-            <label>
-                Nombre
-                <input class="form-control" value="@newLeagueName" @oninput="eventArgs => newLeagueName = eventArgs.Value?.ToString() ?? string.Empty" maxlength="150" />
-            </label>
-            <label>
-                Region
-                <input class="form-control" value="@newLeagueRegion" @oninput="eventArgs => newLeagueRegion = eventArgs.Value?.ToString() ?? string.Empty" maxlength="120" />
-            </label>
-            <label>
-                Pais
-                <input class="form-control" value="@newLeagueCountry" @oninput="eventArgs => newLeagueCountry = eventArgs.Value?.ToString() ?? string.Empty" maxlength="120" />
-            </label>
-            <button type="button" class="leagues-button" disabled="@isSaving" @onclick="CreateLeagueAsync">
-                @(isSaving ? "Guardando..." : "Crear liga")
-            </button>
-        </div>
-    </section>
-}
-
 @if (leagues.Count == 0)
 {
     <EmptyState Text="No hay ligas cargadas." />
@@ -57,49 +28,157 @@
 else
 {
     <section class="leagues-grid">
-        @foreach (var league in leagues)
+        @foreach (var league in PublicLeagues)
         {
-            <article class="leagues-card">
-                <a class="leagues-card__main" href="leagues/@league.Id">
-                    <span class="leagues-card__mark">@Initials(league.Name)</span>
-                    <div>
-                        <h2>@league.Name</h2>
-                        <p>@LocationText(league.Region, league.Country)</p>
-                    </div>
-                </a>
+            <a class="leagues-card @(league.IsActive ? string.Empty : "leagues-card--archived")" href="leagues/@league.Id">
+                <span class="leagues-card__mark">@Initials(league.Name)</span>
+                <div class="leagues-card__body">
+                    <h2>@league.Name</h2>
+                    <p>@LocationText(league.Region, league.Country)</p>
+                    @if (!league.IsActive)
+                    {
+                        <small class="leagues-pill">Archivada</small>
+                    }
 
-                <div class="leagues-card__meta">
-                    <span><strong>@league.SeasonCount</strong> temporadas</span>
-                    <span><strong>@league.CompetitionCount</strong> competencias</span>
+                    <div class="leagues-card__meta">
+                        <span><strong>@league.SeasonCount</strong> temporadas</span>
+                        <span><strong>@league.CompetitionCount</strong> competiciones</span>
+                    </div>
                 </div>
-
-                @if (canManageLeagues)
-                {
-                    <div class="leagues-edit">
-                        <label>
-                            Editar nombre
-                            <input class="form-control" value="@GetEditName(league.Id)" @oninput="eventArgs => SetEditName(league.Id, eventArgs.Value?.ToString() ?? string.Empty)" maxlength="150" />
-                        </label>
-                        <button type="button" class="leagues-button leagues-button--muted" disabled="@isSaving" @onclick="() => UpdateLeagueNameAsync(league.Id)">
-                            Guardar
-                        </button>
-                    </div>
-                }
-            </article>
+            </a>
         }
     </section>
 }
 
+@if (canManageLeagues)
+{
+    <details class="panel leagues-admin-shell">
+        <summary>
+            <span>
+                <small class="eyebrow">Administracion</small>
+                <strong>Herramientas de ligas</strong>
+            </span>
+            <span class="leagues-admin-shell__hint">Crear y editar</span>
+        </summary>
+
+        <div class="leagues-admin-content">
+            <section class="leagues-admin-card">
+                <div>
+                    <h2>Crear liga</h2>
+                    <p>Disponible para Admin y Moderator. La gestion avanzada queda para fases posteriores.</p>
+                </div>
+
+                <div class="leagues-form">
+                    <label>
+                        Nombre
+                        <input class="form-control" value="@newLeagueName" @oninput="eventArgs => newLeagueName = eventArgs.Value?.ToString() ?? string.Empty" maxlength="150" />
+                    </label>
+                    <label>
+                        Region
+                        <input class="form-control" value="@newLeagueRegion" @oninput="eventArgs => newLeagueRegion = eventArgs.Value?.ToString() ?? string.Empty" maxlength="120" />
+                    </label>
+                    <label>
+                        Pais
+                        <input class="form-control" value="@newLeagueCountry" @oninput="eventArgs => newLeagueCountry = eventArgs.Value?.ToString() ?? string.Empty" maxlength="120" />
+                    </label>
+                    <button type="button" class="leagues-button" disabled="@isSaving" @onclick="CreateLeagueAsync">
+                        @(isSaving ? "Guardando..." : "Crear liga")
+                    </button>
+                </div>
+            </section>
+
+            <section class="leagues-admin-card leagues-admin-card--wide">
+                <div class="leagues-admin-toolbar">
+                    <div>
+                        <h2>Administrar ligas</h2>
+                        <p>Gestion compacta para multiples ligas.</p>
+                    </div>
+                    <label class="checkbox-line">
+                        <input type="checkbox" checked="@showArchived" @onchange="async eventArgs => await ToggleArchivedAsync(eventArgs.Value is true)" />
+                        Mostrar archivadas
+                    </label>
+                </div>
+
+                @if (AdminLeagues.Count == 0)
+                {
+                    <EmptyState Text="No hay ligas para administrar." />
+                }
+                else
+                {
+                    <div class="table-panel leagues-admin-table">
+                        <table>
+                            <colgroup>
+                                <col class="leagues-col-name" />
+                                <col class="leagues-col-region" />
+                                <col class="leagues-col-country" />
+                                <col class="leagues-col-small" />
+                                <col class="leagues-col-small" />
+                                <col class="leagues-col-state" />
+                                <col class="leagues-col-actions" />
+                            </colgroup>
+                            <thead>
+                                <tr>
+                                    <th>Nombre</th>
+                                    <th>Region</th>
+                                    <th>Pais</th>
+                                    <th>Temporadas</th>
+                                    <th>Competiciones</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var league in AdminLeagues)
+                                {
+                                    var edit = GetEditModel(league.Id);
+                                    <tr class="@(!league.IsActive ? "is-archived" : string.Empty)">
+                                        <td>
+                                            <input class="form-control" value="@edit.Name" @oninput="eventArgs => edit.Name = eventArgs.Value?.ToString() ?? string.Empty" maxlength="150" />
+                                        </td>
+                                        <td>
+                                            <input class="form-control" value="@edit.Region" @oninput="eventArgs => edit.Region = eventArgs.Value?.ToString() ?? string.Empty" maxlength="120" />
+                                        </td>
+                                        <td>
+                                            <input class="form-control" value="@edit.Country" @oninput="eventArgs => edit.Country = eventArgs.Value?.ToString() ?? string.Empty" maxlength="120" />
+                                        </td>
+                                        <td>@league.SeasonCount</td>
+                                        <td>@league.CompetitionCount</td>
+                                        <td><span class="leagues-status @(league.IsActive ? "leagues-status--active" : "leagues-status--archived")">@(league.IsActive ? "Activa" : "Archivada")</span></td>
+                                        <td>
+                                            <div class="leagues-actions">
+                                                <a href="leagues/@league.Id">Ver</a>
+                                                <a href="/admin/leagues/@league.Id">Admin</a>
+                                                <button type="button" disabled="@isSaving" @onclick="() => UpdateLeagueAsync(league.Id)">Editar</button>
+                                                <button type="button" disabled="@isSaving" @onclick="() => SetLeagueActiveAsync(league.Id, !league.IsActive)">
+                                                    @(league.IsActive ? "Archivar" : "Reactivar")
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </section>
+        </div>
+    </details>
+}
+
 @code {
-    private readonly Dictionary<Guid, string> editNames = [];
+    private readonly Dictionary<Guid, LeagueEditModel> editModels = [];
     private List<LeagueListItem> leagues = [];
     private bool canManageLeagues;
     private bool isSaving;
     private bool isSuccessMessage;
+    private bool showArchived;
     private string? statusMessage;
     private string newLeagueName = string.Empty;
     private string newLeagueRegion = string.Empty;
     private string newLeagueCountry = string.Empty;
+
+    private IEnumerable<LeagueListItem> PublicLeagues => leagues.Where(league => league.IsActive || showArchived);
+    private List<LeagueListItem> AdminLeagues => leagues.Where(league => showArchived || league.IsActive).ToList();
 
     protected override async Task OnInitializedAsync()
     {
@@ -113,21 +192,35 @@ else
     {
         leagues = await Db.Leagues
             .AsNoTracking()
+            .Where(league => league.IsActive || (canManageLeagues && showArchived))
             .OrderBy(league => league.Name)
             .Select(league => new LeagueListItem(
                 league.Id,
                 league.Name,
                 league.Region,
                 league.Country,
+                league.IsActive,
                 league.Seasons.Count,
-                league.Seasons.SelectMany(season => season.Competitions).Count()))
+                league.Seasons.SelectMany(season => season.Competitions.Where(competition => competition.IsActive)).Count()))
             .ToListAsync();
 
-        editNames.Clear();
+        editModels.Clear();
         foreach (var league in leagues)
         {
-            editNames[league.Id] = league.Name;
+            editModels[league.Id] = new LeagueEditModel
+            {
+                Name = league.Name,
+                Region = league.Region,
+                Country = league.Country,
+                IsActive = league.IsActive
+            };
         }
+    }
+
+    private async Task ToggleArchivedAsync(bool value)
+    {
+        showArchived = value;
+        await LoadLeaguesAsync();
     }
 
     private async Task CreateLeagueAsync()
@@ -177,7 +270,7 @@ else
         }
     }
 
-    private async Task UpdateLeagueNameAsync(Guid leagueId)
+    private async Task UpdateLeagueAsync(Guid leagueId)
     {
         if (!canManageLeagues)
         {
@@ -185,16 +278,13 @@ else
             return;
         }
 
-        var name = GetEditName(leagueId).Trim();
-        if (string.IsNullOrWhiteSpace(name))
+        var edit = GetEditModel(leagueId);
+        var name = edit.Name.Trim();
+        var region = edit.Region.Trim();
+        var country = edit.Country.Trim();
+        if (!ValidateLeagueInput(name, region, country, out var error))
         {
-            SetMessage("El nombre de la liga es obligatorio.", false);
-            return;
-        }
-
-        if (name.Length > 150)
-        {
-            SetMessage("El nombre de la liga no puede superar 150 caracteres.", false);
+            SetMessage(error, false);
             return;
         }
 
@@ -205,7 +295,7 @@ else
             return;
         }
 
-        var exists = await Db.Leagues.AnyAsync(item => item.Id != leagueId && item.Name == name && item.Region == league.Region);
+        var exists = await Db.Leagues.AnyAsync(item => item.Id != leagueId && item.Name == name && item.Region == region);
         if (exists)
         {
             SetMessage("Ya existe otra liga con ese nombre en la misma region.", false);
@@ -215,7 +305,8 @@ else
         isSaving = true;
         try
         {
-            Db.Entry(league).Property(item => item.Name).CurrentValue = name;
+            league.UpdateDetails(name, region, country);
+            league.SetActive(edit.IsActive);
             await Db.SaveChangesAsync();
 
             SetMessage("Liga actualizada correctamente.", true);
@@ -224,6 +315,38 @@ else
         catch (DbUpdateException)
         {
             SetMessage("No se pudo actualizar la liga.", false);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task SetLeagueActiveAsync(Guid leagueId, bool isActive)
+    {
+        if (!canManageLeagues || isSaving)
+        {
+            return;
+        }
+
+        var league = await Db.Leagues.FirstOrDefaultAsync(item => item.Id == leagueId);
+        if (league is null)
+        {
+            SetMessage("Liga no encontrada.", false);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            league.SetActive(isActive);
+            await Db.SaveChangesAsync();
+            SetMessage(isActive ? "Liga reactivada correctamente." : "Liga archivada correctamente.", true);
+            await LoadLeaguesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            SetMessage("No se pudo cambiar el estado de la liga.", false);
         }
         finally
         {
@@ -261,9 +384,16 @@ else
         return true;
     }
 
-    private string GetEditName(Guid leagueId) => editNames.TryGetValue(leagueId, out var name) ? name : string.Empty;
+    private LeagueEditModel GetEditModel(Guid leagueId)
+    {
+        if (!editModels.TryGetValue(leagueId, out var edit))
+        {
+            edit = new LeagueEditModel();
+            editModels[leagueId] = edit;
+        }
 
-    private void SetEditName(Guid leagueId, string name) => editNames[leagueId] = name;
+        return edit;
+    }
 
     private void SetMessage(string message, bool success)
     {
@@ -297,5 +427,13 @@ else
         return string.Concat(parts.Take(2).Select(part => char.ToUpperInvariant(part[0])));
     }
 
-    private sealed record LeagueListItem(Guid Id, string Name, string Region, string Country, int SeasonCount, int CompetitionCount);
+    private sealed record LeagueListItem(Guid Id, string Name, string Region, string Country, bool IsActive, int SeasonCount, int CompetitionCount);
+
+    private sealed class LeagueEditModel
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Region { get; set; } = string.Empty;
+        public string Country { get; set; } = string.Empty;
+        public bool IsActive { get; set; } = true;
+    }
 }

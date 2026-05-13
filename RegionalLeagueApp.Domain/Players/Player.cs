@@ -13,6 +13,7 @@ public sealed class Player : Entity
     public string DisplayName { get; private set; } = string.Empty;
     public int? ShirtNumber { get; private set; }
     public bool IsActive { get; private set; } = true;
+    public DateTime? ArchivedAt { get; private set; }
     public PlayerPosition Position { get; private set; }
     public DateOnly? BirthDate { get; private set; }
     public List<MatchEvent> MatchEvents { get; private set; } = [];
@@ -32,5 +33,11 @@ public sealed class Player : Entity
         Position = position;
         ShirtNumber = shirtNumber;
         BirthDate = birthDate;
+    }
+
+    public void SetActive(bool isActive)
+    {
+        IsActive = isActive;
+        ArchivedAt = isActive ? null : DateTime.UtcNow;
     }
 }

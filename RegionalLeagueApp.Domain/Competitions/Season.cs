@@ -24,4 +24,16 @@ public sealed class Season : Entity
         EndsOn = endsOn;
         IsActive = isActive;
     }
+
+    public void UpdateDetails(string name, DateOnly startsOn, DateOnly endsOn)
+    {
+        Name = name;
+        StartsOn = startsOn;
+        EndsOn = endsOn;
+    }
+
+    public void SetActive(bool isActive)
+    {
+        IsActive = isActive;
+    }
 }

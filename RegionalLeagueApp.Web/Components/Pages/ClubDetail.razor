@@ -10,6 +10,8 @@
 }
 else
 {
+    <PageBreadcrumb BackHref="/clubs" ParentHref="/clubs" ParentLabel="Clubes" CurrentLabel="@club.Name" />
+
     <section class="club-header" style="border-color:@(club.PrimaryColor ?? "#14532d")">
         <ClubLogo Name="@club.Name" LogoPath="@club.LogoPath" Class="club-logo-lg" />
         <div>
@@ -20,18 +22,18 @@ else
         <strong>@(club.FoundedYear?.ToString() ?? "S/D")</strong>
     </section>
 
-    @foreach (var team in club.Teams.OrderBy(x => x.Name))
+    @foreach (var team in DisplayTeams)
     {
         <section class="panel section-gap">
             <h2>@team.Name</h2>
-            @if (team.Players.Count == 0)
+            @if (!team.Players.Any(x => x.IsActive))
             {
                 <EmptyState Text="Plantel pendiente de carga." />
             }
             else
             {
                 <div class="player-grid">
-                    @foreach (var player in team.Players.OrderBy(x => x.ShirtNumber ?? 999).ThenBy(x => x.LastName))
+                    @foreach (var player in team.Players.Where(x => x.IsActive).OrderBy(x => x.ShirtNumber ?? 999).ThenBy(x => x.LastName))
                     {
                         <div class="player-row">
                             <strong>@(player.ShirtNumber?.ToString() ?? "-")</strong>
@@ -48,6 +50,13 @@ else
 @code {
     [Parameter] public Guid Id { get; set; }
     private Club? club;
+    private IEnumerable<Team> DisplayTeams => club is null
+        ? []
+        : club.Teams
+            .Where(x => x.IsActive)
+            .GroupBy(x => x.Name)
+            .Select(x => x.First())
+            .OrderBy(x => x.Name);
 
     protected override async Task OnParametersSetAsync()
     {
@@ -56,6 +65,6 @@ else
             .Include(x => x.Venue)
             .Include(x => x.Teams)
             .ThenInclude(x => x.Players)
-            .FirstOrDefaultAsync(x => x.Id == Id);
+            .FirstOrDefaultAsync(x => x.Id == Id && x.IsActive);
     }
 }

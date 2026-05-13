@@ -12,6 +12,8 @@ public sealed class Team : Entity
     public Competition? Competition { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public string Category { get; private set; } = "First";
+    public bool IsActive { get; private set; } = true;
+    public DateTime? ArchivedAt { get; private set; }
     public List<Player> Players { get; private set; } = [];
 
     private Team()
@@ -24,5 +26,19 @@ public sealed class Team : Entity
         CompetitionId = competitionId;
         Name = name;
         Category = category;
+    }
+
+    public void UpdateDetails(Guid clubId, Guid competitionId, string name, string category)
+    {
+        ClubId = clubId;
+        CompetitionId = competitionId;
+        Name = name;
+        Category = category;
+    }
+
+    public void SetActive(bool isActive)
+    {
+        IsActive = isActive;
+        ArchivedAt = isActive ? null : DateTime.UtcNow;
     }
 }

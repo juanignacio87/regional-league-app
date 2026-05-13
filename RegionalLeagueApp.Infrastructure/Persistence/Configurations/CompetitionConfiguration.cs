@@ -12,6 +12,8 @@ public sealed class CompetitionConfiguration : IEntityTypeConfiguration<Competit
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Name).HasMaxLength(150).IsRequired();
         builder.Property(x => x.Format).HasMaxLength(50).IsRequired();
+        builder.Property(x => x.IsActive).IsRequired();
+        builder.Property(x => x.ArchivedAt);
         builder.HasIndex(x => new { x.SeasonId, x.Name }).IsUnique();
 
         builder.HasMany(x => x.Teams)

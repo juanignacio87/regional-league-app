@@ -48,6 +48,18 @@ p {
     overflow-wrap: anywhere;
 }
 
+.app-main {
+    padding: 1rem;
+}
+
+.content {
+    display: grid;
+    gap: 1rem;
+    margin: 0 auto;
+    max-width: 1180px;
+    width: 100%;
+}
+
 .page-hero,
 .panel,
 .club-card,
@@ -127,6 +139,49 @@ p {
 
 .page-hero .eyebrow {
     color: #bdf4e6;
+}
+
+.page-context {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .75rem;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.page-context__back,
+.breadcrumb-trail {
+    align-items: center;
+    border-radius: 999px;
+    display: inline-flex;
+    font-weight: 900;
+}
+
+.page-context__back {
+    background: #fff;
+    border: 1px solid #dfe8e5;
+    color: #103d35;
+    padding: .45rem .75rem;
+    text-decoration: none;
+}
+
+.breadcrumb-trail {
+    color: #60716d;
+    gap: .45rem;
+    min-width: 0;
+}
+
+.breadcrumb-trail a {
+    color: #0f766e;
+    text-decoration: none;
+}
+
+.breadcrumb-trail span:last-child {
+    color: #17211f;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .home-hero {
@@ -349,7 +404,7 @@ p {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .leagues-admin {
+    .leagues-admin-card {
         grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
     }
 
@@ -360,6 +415,11 @@ p {
     .leagues-edit {
         align-items: end;
         grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .clubs-form {
+        align-items: end;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
 
@@ -564,8 +624,44 @@ p {
     text-decoration: none;
 }
 
+.standings-club-link small {
+    color: #60716d;
+    display: block;
+    font-size: .75rem;
+}
+
+.standings-section-title {
+    align-items: center;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    margin-bottom: .85rem;
+}
+
+.standings-section-title h2 {
+    margin: 0;
+}
+
+.standings-section-title span {
+    background: #e6f3ef;
+    border-radius: 999px;
+    color: #0f4f43;
+    font-size: .82rem;
+    font-weight: 900;
+    padding: .35rem .65rem;
+}
+
 .leagues-hero {
     margin-bottom: 1rem;
+    min-height: 150px;
+    padding: 1.25rem;
+}
+
+.leagues-global-note {
+    color: #d5f7ef;
+    display: block;
+    font-weight: 800;
+    margin-top: .75rem;
 }
 
 .leagues-message {
@@ -587,25 +683,71 @@ p {
     color: #9f1239;
 }
 
-.leagues-admin {
-    display: grid;
-    gap: 1rem;
-    margin-bottom: 1rem;
+.leagues-admin-shell {
+    margin-top: 1rem;
 }
 
-.leagues-admin h2,
+.leagues-admin-shell summary {
+    align-items: center;
+    cursor: pointer;
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+    list-style: none;
+}
+
+.leagues-admin-shell summary::-webkit-details-marker {
+    display: none;
+}
+
+.leagues-admin-shell summary strong {
+    display: block;
+    font-size: 1.05rem;
+}
+
+.leagues-admin-shell__hint {
+    background: #e6f3ef;
+    border-radius: 999px;
+    color: #0f4f43;
+    font-size: .82rem;
+    font-weight: 900;
+    padding: .35rem .65rem;
+}
+
+.leagues-admin-content {
+    display: grid;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.leagues-admin-card {
+    background: #fbfdfc;
+    border: 1px solid #edf2f0;
+    border-radius: 8px;
+    display: grid;
+    gap: 1rem;
+    padding: 1rem;
+}
+
+.leagues-admin-card--wide {
+    display: block;
+    grid-template-columns: 1fr !important;
+}
+
+.leagues-admin-card h2,
 .leagues-card h2,
 .leagues-section-title h2 {
     margin: 0;
 }
 
-.leagues-admin p {
+.leagues-admin-card p {
     color: #60716d;
     margin-bottom: 0;
 }
 
 .leagues-form,
-.leagues-edit {
+.leagues-edit,
+.leagues-edit-list {
     display: grid;
     gap: .75rem;
 }
@@ -642,32 +784,55 @@ p {
 
 .leagues-grid {
     display: grid;
-    gap: 1rem;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: .75rem;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .leagues-card {
+    align-items: center;
     background: #fff;
     border: 1px solid #dfe8e5;
     border-radius: 8px;
     box-shadow: 0 10px 30px rgba(15, 61, 53, .06);
-    display: grid;
-    gap: 1rem;
-    padding: 1.1rem;
-}
-
-.leagues-card__main {
-    align-items: center;
     color: inherit;
     display: grid;
-    gap: .8rem;
+    gap: .7rem;
     grid-template-columns: auto minmax(0, 1fr);
+    min-width: 0;
+    padding: .85rem;
     text-decoration: none;
+    transition: border-color .15s ease, transform .15s ease;
 }
 
-.leagues-card__main p {
+.leagues-card--archived {
+    opacity: .72;
+}
+
+.leagues-card:hover {
+    border-color: #bddbd3;
+    transform: translateY(-1px);
+}
+
+.leagues-card__body {
+    min-width: 0;
+}
+
+.leagues-card__body h2 {
+    font-size: 1rem;
+    line-height: 1.15;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.leagues-card__body p {
     color: #60716d;
+    font-size: .86rem;
     margin: .15rem 0 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .leagues-card__mark {
@@ -677,9 +842,9 @@ p {
     color: #fff;
     display: inline-flex;
     font-weight: 900;
-    height: 48px;
+    height: 40px;
     justify-content: center;
-    width: 48px;
+    width: 40px;
 }
 
 .leagues-card__meta,
@@ -690,6 +855,7 @@ p {
 
 .leagues-card__meta {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: .65rem;
 }
 
 .leagues-card__meta span,
@@ -703,7 +869,8 @@ p {
 
 .leagues-card__meta span {
     color: #60716d;
-    padding: .65rem;
+    font-size: .8rem;
+    padding: .5rem;
 }
 
 .leagues-card__meta strong {
@@ -792,10 +959,412 @@ p {
     text-decoration: none;
 }
 
+.league-ops {
+    margin-bottom: 1rem;
+}
+
+.league-ops summary {
+    align-items: center;
+    cursor: pointer;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    list-style: none;
+}
+
+.league-ops summary::-webkit-details-marker {
+    display: none;
+}
+
+.league-ops-grid {
+    display: grid;
+    gap: .85rem;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    margin-top: 1rem;
+}
+
+.league-ops-card,
+.league-competition-card {
+    background: #fbfdfc;
+    border: 1px solid #edf2f0;
+    border-radius: 8px;
+    padding: .85rem;
+}
+
+.league-ops-card h2,
+.league-competition-card h3,
+.league-competition-card h4 {
+    margin: 0 0 .65rem;
+}
+
+.league-ops-form,
+.league-inline-edit {
+    display: grid;
+    gap: .6rem;
+}
+
+.league-ops-form label {
+    color: #40514d;
+    display: grid;
+    font-size: .86rem;
+    font-weight: 800;
+    gap: .35rem;
+}
+
+.league-structure {
+    display: grid;
+    gap: 1rem;
+}
+
+.league-season-card {
+    display: grid;
+    gap: 1rem;
+}
+
+.league-section-title {
+    align-items: center;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+}
+
+.league-section-title h2,
+.league-section-title h3,
+.league-section-title p {
+    margin: 0;
+}
+
+.league-section-title span {
+    color: #60716d;
+}
+
+.league-inline-edit {
+    align-items: end;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.league-competition-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, .75fr);
+}
+
+.league-match-list {
+    display: grid;
+    gap: .5rem;
+}
+
+.league-match-list a {
+    background: #fff;
+    border: 1px solid #edf2f0;
+    border-radius: 8px;
+    color: inherit;
+    display: grid;
+    gap: .1rem;
+    padding: .65rem;
+    text-decoration: none;
+}
+
+.league-match-list span,
+.league-match-list small {
+    color: #60716d;
+}
+
+.admin-league-entry,
+.admin-league-header,
+.admin-league-toolbar {
+    align-items: center;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+}
+
+.admin-league-entry h2,
+.admin-league-header h1,
+.admin-league-toolbar h2 {
+    margin: 0;
+}
+
+.admin-league-entry span,
+.admin-league-header p,
+.admin-league-toolbar span {
+    color: #60716d;
+}
+
+.admin-league-header {
+    background: #f8fbfa;
+    border: 1px solid #e4ece9;
+    border-radius: 10px;
+    margin-bottom: 1rem;
+    padding: 1rem;
+}
+
+.admin-league-header__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    justify-content: flex-end;
+}
+
+.admin-league-summary {
+    margin-bottom: 1rem;
+}
+
+.admin-league-dashboard {
+    background: #fff;
+    border: 1px solid #e8efec;
+    border-radius: 10px;
+    display: grid;
+    gap: .85rem;
+    margin-bottom: 1rem;
+    padding: 1rem;
+}
+
+.admin-league-toolbar {
+    border-bottom: 1px solid #edf2f0;
+    padding-bottom: .75rem;
+}
+
+.admin-league-forms {
+    grid-template-columns: repeat(4, minmax(220px, 1fr));
+    margin-top: 0;
+}
+
+.admin-league-forms .league-ops-card {
+    padding: .75rem;
+}
+
+.admin-league-forms .league-ops-card h2 {
+    font-size: 1rem;
+}
+
+.admin-league-forms .form-control,
+.admin-league-structure .form-control {
+    min-height: 2.25rem;
+    padding-block: .45rem;
+}
+
+.admin-league-structure {
+    gap: .85rem;
+}
+
+.admin-league-structure .league-season-card {
+    padding: 1rem;
+}
+
+.admin-league-structure .league-competition-card {
+    padding: .75rem;
+}
+
+.admin-league-structure .league-section-title {
+    align-items: flex-start;
+}
+
+.admin-league-structure .league-inline-edit {
+    grid-template-columns: minmax(180px, 1.2fr) minmax(130px, .7fr) minmax(130px, .7fr) auto auto;
+}
+
+.hero-actions__admin {
+    background: #123c35 !important;
+    color: #fff !important;
+}
+
+.leagues-admin-toolbar {
+    align-items: start;
+    display: grid;
+    gap: .75rem;
+    grid-template-columns: 1fr;
+    margin-bottom: 1rem;
+}
+
+.leagues-admin-table {
+    overflow-x: visible;
+    width: 100%;
+}
+
+.leagues-admin-table table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.leagues-col-name {
+    width: 30%;
+}
+
+.leagues-col-region,
+.leagues-col-country {
+    width: 18%;
+}
+
+.leagues-col-small {
+    width: 6%;
+}
+
+.leagues-col-state {
+    width: 8%;
+}
+
+.leagues-col-actions {
+    width: 14%;
+}
+
+.leagues-admin-table th,
+.leagues-admin-table td {
+    white-space: normal;
+}
+
+.leagues-admin-table td:nth-child(1) .form-control,
+.leagues-admin-table td:nth-child(2) .form-control,
+.leagues-admin-table td:nth-child(3) .form-control {
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
+.leagues-admin-table td {
+    vertical-align: middle;
+}
+
+.leagues-admin-table .form-control {
+    min-width: 0;
+    width: 100%;
+}
+
+.leagues-admin-table tr.is-archived {
+    opacity: .7;
+}
+
+.leagues-status {
+    border-radius: 999px;
+    display: inline-block;
+    font-size: .78rem;
+    font-weight: 900;
+    padding: .3rem .55rem;
+}
+
+.leagues-status--active {
+    background: #e6f3ef;
+    color: #0f4f43;
+}
+
+.leagues-status--archived {
+    background: #f1f5f4;
+    color: #60716d;
+}
+
+.leagues-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+}
+
+.leagues-actions a,
+.leagues-actions button {
+    background: #e6f3ef;
+    border: 0;
+    border-radius: 999px;
+    color: #0f4f43;
+    cursor: pointer;
+    font-size: .8rem;
+    font-weight: 900;
+    padding: .35rem .55rem;
+    text-decoration: none;
+}
+
+.leagues-actions button:last-child {
+    background: #f1f5f4;
+    color: #40514d;
+}
+
 .club-grid {
     display: grid;
     gap: 1rem;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.clubs-admin-shell {
+    margin-bottom: 1rem;
+}
+
+.clubs-admin-shell summary {
+    align-items: center;
+    cursor: pointer;
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+    list-style: none;
+}
+
+.clubs-admin-shell summary::-webkit-details-marker {
+    display: none;
+}
+
+.clubs-admin-shell summary strong {
+    display: block;
+    font-size: 1.05rem;
+}
+
+.clubs-admin-shell__hint {
+    background: #e6f3ef;
+    border-radius: 999px;
+    color: #0f4f43;
+    font-size: .82rem;
+    font-weight: 900;
+    padding: .35rem .65rem;
+}
+
+.clubs-form {
+    display: grid;
+    gap: .75rem;
+    margin-top: 1rem;
+}
+
+.clubs-form label {
+    color: #40514d;
+    display: grid;
+    font-size: .86rem;
+    font-weight: 800;
+    gap: .35rem;
+}
+
+.clubs-admin-block {
+    border-top: 1px solid #edf2f0;
+    display: grid;
+    gap: .85rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+}
+
+.clubs-admin-block h2 {
+    font-size: 1.05rem;
+    margin: 0;
+}
+
+.clubs-edit-list {
+    display: grid;
+    gap: .75rem;
+}
+
+.clubs-edit-row {
+    align-items: end;
+    background: #fbfdfc;
+    border: 1px solid #edf2f0;
+    border-radius: 8px;
+    display: grid;
+    gap: .75rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+    padding: .75rem;
+}
+
+.clubs-edit-row--team {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) auto auto;
+}
+
+.clubs-edit-row label {
+    color: #40514d;
+    display: grid;
+    font-size: .86rem;
+    font-weight: 800;
+    gap: .35rem;
 }
 
 .club-card {
@@ -1689,6 +2258,59 @@ p {
         display: block;
     }
 
+    .page-context {
+        align-items: flex-start;
+        display: grid;
+        justify-content: stretch;
+    }
+
+    .clubs-admin-shell summary {
+        grid-template-columns: 1fr;
+    }
+
+    .leagues-admin-table {
+        overflow-x: auto;
+    }
+
+    .leagues-admin-table table {
+        min-width: 860px;
+    }
+
+    .league-competition-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .league-section-title,
+    .league-ops summary {
+        align-items: flex-start;
+        display: grid;
+    }
+
+    .admin-league-entry,
+    .admin-league-header,
+    .admin-league-toolbar {
+        align-items: flex-start;
+        display: grid;
+    }
+
+    .admin-league-header__actions {
+        justify-content: flex-start;
+    }
+
+    .admin-league-forms,
+    .admin-league-structure .league-inline-edit {
+        grid-template-columns: 1fr;
+    }
+
+    .clubs-edit-row,
+    .clubs-edit-row--team {
+        grid-template-columns: 1fr;
+    }
+
+    .breadcrumb-trail {
+        justify-content: flex-start;
+    }
+
     .admin-editor {
         position: static;
     }
@@ -1722,7 +2344,9 @@ p {
 
     .leagues-summary,
     .leagues-card__meta,
-    .leagues-list-row {
+    .leagues-list-row,
+    .leagues-card,
+    .leagues-admin-shell summary {
         grid-template-columns: 1fr;
     }
 

@@ -13,6 +13,8 @@ public sealed class LeagueConfiguration : IEntityTypeConfiguration<League>
         builder.Property(x => x.Name).HasMaxLength(150).IsRequired();
         builder.Property(x => x.Region).HasMaxLength(120).IsRequired();
         builder.Property(x => x.Country).HasMaxLength(120).IsRequired();
+        builder.Property(x => x.IsActive).IsRequired();
+        builder.Property(x => x.ArchivedAt);
         builder.HasIndex(x => new { x.Name, x.Region }).IsUnique();
 
         builder.HasMany(x => x.Seasons)

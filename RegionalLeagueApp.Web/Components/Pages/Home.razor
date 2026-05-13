@@ -222,6 +222,7 @@
         topScorers = await LoadTopScorersAsync();
         featuredClubs = await Db.Clubs
             .AsNoTracking()
+            .Where(x => x.IsActive)
             .OrderBy(x => x.Name)
             .Take(8)
             .Select(x => new HomeClubRow(x.Id, x.Name, x.ShortName, x.LogoPath))
@@ -232,13 +233,25 @@
         .AsNoTracking()
         .Include(x => x.Round)
         .Include(x => x.HomeTeam)!.ThenInclude(x => x!.Club)
-        .Include(x => x.AwayTeam)!.ThenInclude(x => x!.Club);
+        .Include(x => x.AwayTeam)!.ThenInclude(x => x!.Club)
+        .Where(x =>
+            x.Competition!.IsActive &&
+            x.Competition.Season!.League!.IsActive &&
+            x.HomeTeam!.IsActive &&
+            x.HomeTeam.Club!.IsActive &&
+            x.AwayTeam!.IsActive &&
+            x.AwayTeam.Club!.IsActive);
 
     private async Task<List<HomeScorerRow>> LoadTopScorersAsync()
     {
         var goalEvents = await Db.MatchEvents
             .AsNoTracking()
-            .Where(x => x.Type == MatchEventType.Goal && (x.PlayerId != null || x.PlayerName != string.Empty))
+            .Where(x =>
+                x.Type == MatchEventType.Goal &&
+                (x.PlayerId != null || x.PlayerName != string.Empty) &&
+                x.Team!.IsActive &&
+                x.Team.Club!.IsActive &&
+                (x.Player == null || x.Player.IsActive))
             .Select(x => new
             {
                 x.PlayerId,

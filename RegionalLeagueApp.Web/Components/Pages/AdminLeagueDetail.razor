@@ -1,0 +1,742 @@
+@page "/admin/leagues/{Id:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin,Moderator")]
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Administrar liga</PageTitle>
+
+@if (league is null)
+{
+    <EmptyState Text="Liga no encontrada." />
+}
+else
+{
+    <PageBreadcrumb BackHref="/admin" ParentHref="/admin" ParentLabel="Admin" CurrentLabel="@league.Name" />
+
+    <section class="admin-league-header">
+        <div>
+            <p class="eyebrow">Administracion deportiva</p>
+            <h1>@league.Name</h1>
+            <p>@LocationText(league.Region, league.Country)</p>
+        </div>
+        <div class="admin-league-header__actions">
+            <a class="leagues-button leagues-button--muted" href="/leagues/@league.Id">Vista publica</a>
+            <a class="leagues-button leagues-button--muted" href="/admin">Admin general</a>
+        </div>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(statusMessage))
+    {
+        <div class="leagues-message @(isSuccessMessage ? "leagues-message--success" : "leagues-message--error")">
+            @statusMessage
+        </div>
+    }
+
+    <section class="leagues-summary admin-league-summary">
+        <article>
+            <strong>@DisplaySeasons.Count</strong>
+            <span>Temporadas</span>
+        </article>
+        <article>
+            <strong>@competitions.Count</strong>
+            <span>Competencias</span>
+        </article>
+        <article>
+            <strong>@participants.Count</strong>
+            <span>Clubes/equipos</span>
+        </article>
+    </section>
+
+    @if (canManage)
+    {
+        <section class="admin-league-dashboard">
+            <div class="admin-league-toolbar">
+                <div>
+                    <p class="eyebrow">Operaciones</p>
+                    <h2>Estructura deportiva</h2>
+                    <span>Gestion compacta de temporadas, competencias, equipos y partidos.</span>
+                </div>
+            </div>
+
+            <div class="league-ops-grid admin-league-forms">
+                <section class="league-ops-card">
+                    <h2>Crear temporada</h2>
+                    <div class="league-ops-form">
+                        <label>Nombre <input class="form-control" value="@newSeasonName" @oninput="e => newSeasonName = e.Value?.ToString() ?? string.Empty" maxlength="120" /></label>
+                        <label>Inicio <input class="form-control" type="date" value="@newSeasonStartsOn" @oninput="e => newSeasonStartsOn = e.Value?.ToString() ?? string.Empty" /></label>
+                        <label>Fin <input class="form-control" type="date" value="@newSeasonEndsOn" @oninput="e => newSeasonEndsOn = e.Value?.ToString() ?? string.Empty" /></label>
+                        <label class="checkbox-line"><input type="checkbox" checked="@newSeasonIsActive" @onchange="e => newSeasonIsActive = e.Value is true" /> Activa</label>
+                        <button class="leagues-button" type="button" disabled="@isSaving" @onclick="CreateSeasonAsync">Crear</button>
+                    </div>
+                </section>
+
+                <section class="league-ops-card">
+                    <h2>Crear competencia</h2>
+                    <div class="league-ops-form">
+                        <label>
+                            Temporada
+                            <select class="form-control" @bind="newCompetitionSeasonId">
+                                <option value="">Seleccionar</option>
+                                @foreach (var season in DisplaySeasons)
+                                {
+                                    <option value="@season.Id">@season.Name</option>
+                                }
+                            </select>
+                        </label>
+                        <label>Nombre <input class="form-control" value="@newCompetitionName" @oninput="e => newCompetitionName = e.Value?.ToString() ?? string.Empty" maxlength="150" /></label>
+                        <label>Formato <input class="form-control" value="@newCompetitionFormat" @oninput="e => newCompetitionFormat = e.Value?.ToString() ?? string.Empty" maxlength="50" /></label>
+                        <label class="checkbox-line"><input type="checkbox" checked="@newCompetitionIsActive" @onchange="e => newCompetitionIsActive = e.Value is true" /> Activa</label>
+                        <button class="leagues-button" type="button" disabled="@isSaving" @onclick="CreateCompetitionAsync">Crear</button>
+                    </div>
+                </section>
+
+                <section class="league-ops-card">
+                    <h2>Agregar equipo</h2>
+                    <div class="league-ops-form">
+                        <label>
+                            Competencia
+                            <select class="form-control" @bind="newTeamCompetitionId">
+                                <option value="">Seleccionar</option>
+                                @foreach (var competition in competitionOptions)
+                                {
+                                    <option value="@competition.Id">@competition.Label</option>
+                                }
+                            </select>
+                        </label>
+                        <label>
+                            Club
+                            <select class="form-control" @bind="newTeamClubId">
+                                <option value="">Seleccionar</option>
+                                @foreach (var club in clubOptions)
+                                {
+                                    <option value="@club.Id">@club.Name</option>
+                                }
+                            </select>
+                        </label>
+                        <label>Nombre equipo <input class="form-control" value="@newTeamName" @oninput="e => newTeamName = e.Value?.ToString() ?? string.Empty" maxlength="150" /></label>
+                        <label>Categoria <input class="form-control" value="@newTeamCategory" @oninput="e => newTeamCategory = e.Value?.ToString() ?? string.Empty" maxlength="60" /></label>
+                        <button class="leagues-button" type="button" disabled="@isSaving" @onclick="AddTeamAsync">Agregar</button>
+                    </div>
+                </section>
+
+                <section class="league-ops-card">
+                    <h2>Crear partido</h2>
+                    <div class="league-ops-form">
+                        <label>
+                            Competencia
+                            <select class="form-control" @bind="newMatchCompetitionId" @bind:after="OnMatchCompetitionChangedAsync">
+                                <option value="">Seleccionar</option>
+                                @foreach (var competition in competitionOptions)
+                                {
+                                    <option value="@competition.Id">@competition.Label</option>
+                                }
+                            </select>
+                        </label>
+                        <label>Jornada <input class="form-control" value="@newMatchRoundName" @oninput="e => newMatchRoundName = e.Value?.ToString() ?? string.Empty" maxlength="100" /></label>
+                        <label>Fecha/hora <input class="form-control" type="datetime-local" value="@newMatchStartsAt" @oninput="e => newMatchStartsAt = e.Value?.ToString() ?? string.Empty" /></label>
+                        <label>
+                            Local
+                            <select class="form-control" @bind="newMatchHomeTeamId">
+                                <option value="">Seleccionar</option>
+                                @foreach (var team in matchTeamOptions)
+                                {
+                                    <option value="@team.Id">@team.Label</option>
+                                }
+                            </select>
+                        </label>
+                        <label>
+                            Visitante
+                            <select class="form-control" @bind="newMatchAwayTeamId">
+                                <option value="">Seleccionar</option>
+                                @foreach (var team in matchTeamOptions)
+                                {
+                                    <option value="@team.Id">@team.Label</option>
+                                }
+                            </select>
+                        </label>
+                        <button class="leagues-button" type="button" disabled="@isSaving" @onclick="CreateMatchAsync">Crear partido</button>
+                    </div>
+                </section>
+            </div>
+        </section>
+    }
+
+    <section class="league-structure admin-league-structure">
+        @if (DisplaySeasons.Count == 0)
+        {
+            <EmptyState Text="No hay temporadas activas para esta liga." />
+        }
+        else
+        {
+            @foreach (var season in DisplaySeasons)
+            {
+                var seasonEdit = GetSeasonEdit(season.Id);
+                <article class="panel league-season-card">
+                    <div class="league-section-title">
+                        <div>
+                            <p class="eyebrow">Temporada</p>
+                            <h2>@season.Name</h2>
+                            <span>@season.StartsOn.ToString("dd/MM/yyyy") - @season.EndsOn.ToString("dd/MM/yyyy")</span>
+                        </div>
+                        <span class="leagues-status @(season.IsActive ? "leagues-status--active" : "leagues-status--archived")">@(season.IsActive ? "Activa" : "Archivada")</span>
+                    </div>
+
+                    @if (canManage)
+                    {
+                        <div class="league-inline-edit">
+                            <input class="form-control" value="@seasonEdit.Name" @oninput="e => seasonEdit.Name = e.Value?.ToString() ?? string.Empty" />
+                            <input class="form-control" type="date" value="@seasonEdit.StartsOn" @oninput="e => seasonEdit.StartsOn = e.Value?.ToString() ?? string.Empty" />
+                            <input class="form-control" type="date" value="@seasonEdit.EndsOn" @oninput="e => seasonEdit.EndsOn = e.Value?.ToString() ?? string.Empty" />
+                            <button type="button" class="leagues-button leagues-button--muted" @onclick="() => UpdateSeasonAsync(season.Id)">Guardar</button>
+                            <button type="button" class="leagues-button leagues-button--muted" @onclick="() => SetSeasonActiveAsync(season.Id, !season.IsActive)">@(season.IsActive ? "Archivar" : "Reactivar")</button>
+                        </div>
+                    }
+
+                    @foreach (var competition in season.Competitions.Where(x => canManage || x.IsActive).OrderBy(x => x.Name))
+                    {
+                        var competitionEdit = GetCompetitionEdit(competition.Id);
+                        <section class="league-competition-card">
+                            <div class="league-section-title">
+                                <div>
+                                    <p class="eyebrow">Competencia</p>
+                                    <h3>@competition.Name</h3>
+                                    <span>@competition.Format</span>
+                                </div>
+                                <span class="leagues-status @(competition.IsActive ? "leagues-status--active" : "leagues-status--archived")">@(competition.IsActive ? "Activa" : "Archivada")</span>
+                            </div>
+
+                            @if (canManage)
+                            {
+                                <div class="league-inline-edit">
+                                    <input class="form-control" value="@competitionEdit.Name" @oninput="e => competitionEdit.Name = e.Value?.ToString() ?? string.Empty" />
+                                    <input class="form-control" value="@competitionEdit.Format" @oninput="e => competitionEdit.Format = e.Value?.ToString() ?? string.Empty" />
+                                    <button type="button" class="leagues-button leagues-button--muted" @onclick="() => UpdateCompetitionAsync(competition.Id)">Guardar</button>
+                                    <button type="button" class="leagues-button leagues-button--muted" @onclick="() => SetCompetitionActiveAsync(competition.Id, !competition.IsActive)">@(competition.IsActive ? "Archivar" : "Reactivar")</button>
+                                </div>
+                            }
+
+                            <div class="league-competition-grid">
+                                <div>
+                                    <h4>Equipos participantes</h4>
+                                    @if (!competition.Teams.Any(x => x.IsActive))
+                                    {
+                                        <EmptyState Text="No hay equipos en esta competencia." />
+                                    }
+                                    else
+                                    {
+                                        <div class="leagues-participants">
+                                            @foreach (var team in competition.Teams.Where(x => x.IsActive && x.Club is not null && x.Club.IsActive).OrderBy(x => x.Club!.Name))
+                                            {
+                                                <a class="leagues-participant" href="/clubs/@team.ClubId">
+                                                    <ClubLogo Name="@team.Club!.Name" LogoPath="@team.Club.LogoPath" />
+                                                    <div><strong>@team.Club.Name</strong><span>@team.Name - @team.Category</span></div>
+                                                </a>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                                <div>
+                                    <h4>Partidos</h4>
+                                    @if (!competition.Matches.Any())
+                                    {
+                                        <EmptyState Text="No hay partidos cargados." />
+                                    }
+                                    else
+                                    {
+                                        <div class="league-match-list">
+                                            @foreach (var match in competition.Matches.OrderBy(x => x.StartsAt).Take(8))
+                                            {
+                                                <a href="/matches/@match.Id">
+                                                    <span>@(match.Round?.Name ?? "Fecha")</span>
+                                                    <strong>@(match.HomeTeam?.Club?.ShortName ?? "LOC") vs @(match.AwayTeam?.Club?.ShortName ?? "VIS")</strong>
+                                                    <small>@match.StartsAt.LocalDateTime.ToString("dd/MM HH:mm") - @match.Status</small>
+                                                </a>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </section>
+                    }
+                </article>
+            }
+        }
+    </section>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private League? league;
+    private List<CompetitionItem> competitions = [];
+    private List<ParticipantItem> participants = [];
+    private List<ClubOption> clubOptions = [];
+    private List<CompetitionOption> competitionOptions = [];
+    private List<TeamOption> matchTeamOptions = [];
+    private readonly Dictionary<Guid, SeasonEditModel> seasonEdits = [];
+    private readonly Dictionary<Guid, CompetitionEditModel> competitionEdits = [];
+    private bool canManage;
+    private bool isSaving;
+    private bool isSuccessMessage;
+    private string? statusMessage;
+    private string newSeasonName = string.Empty;
+    private string newSeasonStartsOn = string.Empty;
+    private string newSeasonEndsOn = string.Empty;
+    private bool newSeasonIsActive = true;
+    private Guid? newCompetitionSeasonId;
+    private string newCompetitionName = string.Empty;
+    private string newCompetitionFormat = "League";
+    private bool newCompetitionIsActive = true;
+    private Guid? newTeamCompetitionId;
+    private Guid? newTeamClubId;
+    private string newTeamName = string.Empty;
+    private string newTeamCategory = "Primera";
+    private Guid? newMatchCompetitionId;
+    private Guid? newMatchHomeTeamId;
+    private Guid? newMatchAwayTeamId;
+    private string newMatchRoundName = string.Empty;
+    private string newMatchStartsAt = string.Empty;
+
+    private List<Season> DisplaySeasons => league?.Seasons
+        .Where(x => canManage || x.IsActive)
+        .OrderByDescending(x => x.IsActive)
+        .ThenByDescending(x => x.StartsOn)
+        .ToList() ?? [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        canManage = authState.User.IsInRole(AppRoles.Admin) || authState.User.IsInRole(AppRoles.Moderator);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        league = await Db.Leagues
+            .AsNoTracking()
+            .Include(item => item.Seasons)
+                .ThenInclude(item => item.Competitions)
+                    .ThenInclude(item => item.Teams)
+                        .ThenInclude(item => item.Club)
+            .Include(item => item.Seasons)
+                .ThenInclude(item => item.Competitions)
+                    .ThenInclude(item => item.Matches)
+                        .ThenInclude(item => item.Round)
+            .Include(item => item.Seasons)
+                .ThenInclude(item => item.Competitions)
+                    .ThenInclude(item => item.Matches)
+                        .ThenInclude(item => item.HomeTeam)!.ThenInclude(item => item!.Club)
+            .Include(item => item.Seasons)
+                .ThenInclude(item => item.Competitions)
+                    .ThenInclude(item => item.Matches)
+                        .ThenInclude(item => item.AwayTeam)!.ThenInclude(item => item!.Club)
+            .FirstOrDefaultAsync(item => item.Id == Id && (item.IsActive || canManage));
+
+        if (league is null)
+        {
+            competitions = [];
+            participants = [];
+            return;
+        }
+
+        competitions = league.Seasons
+            .Where(season => canManage || season.IsActive)
+            .SelectMany(season => season.Competitions.Where(competition => canManage || competition.IsActive).Select(competition => new CompetitionItem(
+                competition.Id,
+                competition.Name,
+                season.Name,
+                competition.Format,
+                competition.Teams.Count(team => team.IsActive && team.Club is not null && team.Club.IsActive))))
+            .OrderBy(item => item.SeasonName)
+            .ThenBy(item => item.Name)
+            .ToList();
+
+        participants = league.Seasons
+            .SelectMany(season => season.Competitions)
+            .Where(competition => canManage || competition.IsActive)
+            .SelectMany(competition => competition.Teams)
+            .Where(team => team.IsActive && team.Club is not null && team.Club.IsActive)
+            .GroupBy(team => new { team.ClubId, ClubName = team.Club!.Name, team.Club.LogoPath, team.Name })
+            .Select(group => new ParticipantItem(group.Key.ClubId, group.Key.ClubName, group.Key.LogoPath, group.Key.Name))
+            .OrderBy(item => item.ClubName)
+            .ThenBy(item => item.TeamName)
+            .ToList();
+
+        clubOptions = await Db.Clubs
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .OrderBy(x => x.Name)
+            .Select(x => new ClubOption(x.Id, x.Name))
+            .ToListAsync();
+
+        competitionOptions = competitions
+            .Select(x => new CompetitionOption(x.Id, $"{x.SeasonName} - {x.Name}"))
+            .ToList();
+
+        PrepareEditModels();
+        await LoadMatchTeamOptionsAsync();
+    }
+
+    private void PrepareEditModels()
+    {
+        seasonEdits.Clear();
+        foreach (var season in DisplaySeasons)
+        {
+            seasonEdits[season.Id] = new SeasonEditModel(season.Name, season.StartsOn.ToString("yyyy-MM-dd"), season.EndsOn.ToString("yyyy-MM-dd"));
+        }
+
+        competitionEdits.Clear();
+        foreach (var competition in league?.Seasons.SelectMany(x => x.Competitions) ?? [])
+        {
+            competitionEdits[competition.Id] = new CompetitionEditModel(competition.Name, competition.Format);
+        }
+    }
+
+    private async Task CreateSeasonAsync()
+    {
+        if (!canManage || isSaving)
+        {
+            return;
+        }
+
+        if (!TryParseSeason(newSeasonName, newSeasonStartsOn, newSeasonEndsOn, out var name, out var startsOn, out var endsOn, out var error))
+        {
+            SetMessage(error, false);
+            return;
+        }
+
+        if (await Db.Seasons.AnyAsync(x => x.LeagueId == Id && x.Name == name))
+        {
+            SetMessage("Ya existe una temporada con ese nombre.", false);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            Db.Seasons.Add(new Season(Id, name, startsOn, endsOn, newSeasonIsActive));
+            await Db.SaveChangesAsync();
+            newSeasonName = string.Empty;
+            newSeasonStartsOn = string.Empty;
+            newSeasonEndsOn = string.Empty;
+            SetMessage("Temporada creada correctamente.", true);
+            await LoadAsync();
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task UpdateSeasonAsync(Guid seasonId)
+    {
+        var edit = GetSeasonEdit(seasonId);
+        if (!TryParseSeason(edit.Name, edit.StartsOn, edit.EndsOn, out var name, out var startsOn, out var endsOn, out var error))
+        {
+            SetMessage(error, false);
+            return;
+        }
+
+        var season = await Db.Seasons.FirstOrDefaultAsync(x => x.Id == seasonId && x.LeagueId == Id);
+        if (season is null)
+        {
+            SetMessage("Temporada no encontrada.", false);
+            return;
+        }
+
+        season.UpdateDetails(name, startsOn, endsOn);
+        await Db.SaveChangesAsync();
+        SetMessage("Temporada actualizada.", true);
+        await LoadAsync();
+    }
+
+    private async Task SetSeasonActiveAsync(Guid seasonId, bool isActive)
+    {
+        var season = await Db.Seasons.FirstOrDefaultAsync(x => x.Id == seasonId && x.LeagueId == Id);
+        if (season is null)
+        {
+            return;
+        }
+
+        season.SetActive(isActive);
+        await Db.SaveChangesAsync();
+        SetMessage(isActive ? "Temporada reactivada." : "Temporada archivada.", true);
+        await LoadAsync();
+    }
+
+    private async Task CreateCompetitionAsync()
+    {
+        if (newCompetitionSeasonId is null || string.IsNullOrWhiteSpace(newCompetitionName))
+        {
+            SetMessage("Temporada y nombre de competencia son obligatorios.", false);
+            return;
+        }
+
+        var name = newCompetitionName.Trim();
+        var format = string.IsNullOrWhiteSpace(newCompetitionFormat) ? "League" : newCompetitionFormat.Trim();
+        if (await Db.Competitions.AnyAsync(x => x.SeasonId == newCompetitionSeasonId && x.Name == name))
+        {
+            SetMessage("Ya existe una competencia con ese nombre en la temporada.", false);
+            return;
+        }
+
+        var competition = new Competition(newCompetitionSeasonId.Value, name, format);
+        competition.SetActive(newCompetitionIsActive);
+        Db.Competitions.Add(competition);
+        await Db.SaveChangesAsync();
+        newCompetitionName = string.Empty;
+        newCompetitionFormat = "League";
+        SetMessage("Competencia creada correctamente.", true);
+        await LoadAsync();
+    }
+
+    private async Task UpdateCompetitionAsync(Guid competitionId)
+    {
+        var edit = GetCompetitionEdit(competitionId);
+        var name = edit.Name.Trim();
+        var format = string.IsNullOrWhiteSpace(edit.Format) ? "League" : edit.Format.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            SetMessage("El nombre de competencia es obligatorio.", false);
+            return;
+        }
+
+        var competition = await Db.Competitions.FirstOrDefaultAsync(x => x.Id == competitionId);
+        if (competition is null)
+        {
+            SetMessage("Competencia no encontrada.", false);
+            return;
+        }
+
+        competition.UpdateDetails(name, format);
+        await Db.SaveChangesAsync();
+        SetMessage("Competencia actualizada.", true);
+        await LoadAsync();
+    }
+
+    private async Task SetCompetitionActiveAsync(Guid competitionId, bool isActive)
+    {
+        var competition = await Db.Competitions.FirstOrDefaultAsync(x => x.Id == competitionId);
+        if (competition is null)
+        {
+            return;
+        }
+
+        competition.SetActive(isActive);
+        await Db.SaveChangesAsync();
+        SetMessage(isActive ? "Competencia reactivada." : "Competencia archivada.", true);
+        await LoadAsync();
+    }
+
+    private async Task AddTeamAsync()
+    {
+        if (newTeamCompetitionId is null || newTeamClubId is null)
+        {
+            SetMessage("Selecciona competencia y club.", false);
+            return;
+        }
+
+        var club = await Db.Clubs.AsNoTracking().FirstOrDefaultAsync(x => x.Id == newTeamClubId && x.IsActive);
+        if (club is null)
+        {
+            SetMessage("Club no encontrado.", false);
+            return;
+        }
+
+        var competitionIsActive = await Db.Competitions.AnyAsync(x => x.Id == newTeamCompetitionId && x.IsActive && x.Season!.LeagueId == Id);
+        if (!competitionIsActive)
+        {
+            SetMessage("No se pueden agregar equipos a una competencia archivada o inexistente.", false);
+            return;
+        }
+
+        var name = string.IsNullOrWhiteSpace(newTeamName) ? $"{club.ShortName} {newTeamCategory.Trim()}" : newTeamName.Trim();
+        var category = string.IsNullOrWhiteSpace(newTeamCategory) ? "Primera" : newTeamCategory.Trim();
+        if (await Db.Teams.AnyAsync(x => x.CompetitionId == newTeamCompetitionId && x.ClubId == newTeamClubId))
+        {
+            SetMessage("Ese club ya participa en la competencia.", false);
+            return;
+        }
+
+        Db.Teams.Add(new Team(newTeamClubId.Value, newTeamCompetitionId.Value, name, category));
+        await Db.SaveChangesAsync();
+        newTeamName = string.Empty;
+        SetMessage("Equipo agregado a la competencia.", true);
+        await LoadAsync();
+    }
+
+    private async Task OnMatchCompetitionChangedAsync()
+    {
+        newMatchHomeTeamId = null;
+        newMatchAwayTeamId = null;
+        await LoadMatchTeamOptionsAsync();
+    }
+
+    private async Task LoadMatchTeamOptionsAsync()
+    {
+        matchTeamOptions = newMatchCompetitionId is null
+            ? []
+            : await Db.Teams
+                .AsNoTracking()
+                .Where(x => x.CompetitionId == newMatchCompetitionId && x.IsActive && x.Club!.IsActive)
+                .OrderBy(x => x.Club!.Name)
+                .Select(x => new TeamOption(x.Id, $"{x.Club!.Name} - {x.Name}"))
+                .ToListAsync();
+    }
+
+    private async Task CreateMatchAsync()
+    {
+        if (newMatchCompetitionId is null || newMatchHomeTeamId is null || newMatchAwayTeamId is null)
+        {
+            SetMessage("Competencia, local y visitante son obligatorios.", false);
+            return;
+        }
+
+        if (newMatchHomeTeamId == newMatchAwayTeamId)
+        {
+            SetMessage("Local y visitante deben ser distintos.", false);
+            return;
+        }
+
+        if (!DateTime.TryParse(newMatchStartsAt, out var startsAtLocal))
+        {
+            SetMessage("Fecha/hora de partido invalida.", false);
+            return;
+        }
+
+        var competitionIsActive = await Db.Competitions.AnyAsync(x => x.Id == newMatchCompetitionId && x.IsActive && x.Season!.LeagueId == Id);
+        if (!competitionIsActive)
+        {
+            SetMessage("No se pueden crear partidos en una competencia archivada o inexistente.", false);
+            return;
+        }
+
+        var teamIds = await Db.Teams
+            .AsNoTracking()
+            .Where(x => x.CompetitionId == newMatchCompetitionId && x.IsActive && x.Club!.IsActive)
+            .Select(x => x.Id)
+            .ToListAsync();
+        if (!teamIds.Contains(newMatchHomeTeamId.Value) || !teamIds.Contains(newMatchAwayTeamId.Value))
+        {
+            SetMessage("Ambos equipos deben pertenecer a la competencia.", false);
+            return;
+        }
+
+        var startsAt = new DateTimeOffset(DateTime.SpecifyKind(startsAtLocal, DateTimeKind.Local)).ToUniversalTime();
+        var duplicateMatch = await Db.Matches.AnyAsync(x =>
+            x.CompetitionId == newMatchCompetitionId &&
+            x.HomeTeamId == newMatchHomeTeamId &&
+            x.AwayTeamId == newMatchAwayTeamId &&
+            x.StartsAt == startsAt);
+        if (duplicateMatch)
+        {
+            SetMessage("Ya existe un partido con el mismo local, visitante y fecha/hora.", false);
+            return;
+        }
+
+        var roundName = string.IsNullOrWhiteSpace(newMatchRoundName) ? "Fecha 1" : newMatchRoundName.Trim();
+        var round = await Db.Rounds.FirstOrDefaultAsync(x => x.CompetitionId == newMatchCompetitionId && x.Name == roundName);
+        if (round is null)
+        {
+            var nextSortOrder = await Db.Rounds
+                .Where(x => x.CompetitionId == newMatchCompetitionId)
+                .Select(x => (int?)x.SortOrder)
+                .MaxAsync() ?? 0;
+            round = new Round(newMatchCompetitionId.Value, roundName, nextSortOrder + 1);
+            Db.Rounds.Add(round);
+        }
+
+        Db.Matches.Add(new Match(newMatchCompetitionId.Value, round.Id, newMatchHomeTeamId.Value, newMatchAwayTeamId.Value, startsAt, status: MatchStatus.Scheduled));
+        await Db.SaveChangesAsync();
+        newMatchRoundName = string.Empty;
+        newMatchStartsAt = string.Empty;
+        SetMessage("Partido creado correctamente.", true);
+        await LoadAsync();
+    }
+
+    private SeasonEditModel GetSeasonEdit(Guid seasonId) => seasonEdits.TryGetValue(seasonId, out var edit) ? edit : new SeasonEditModel();
+    private CompetitionEditModel GetCompetitionEdit(Guid competitionId) => competitionEdits.TryGetValue(competitionId, out var edit) ? edit : new CompetitionEditModel();
+
+    private static bool TryParseSeason(string nameInput, string startsInput, string endsInput, out string name, out DateOnly startsOn, out DateOnly endsOn, out string error)
+    {
+        name = nameInput.Trim();
+        startsOn = default;
+        endsOn = default;
+        if (string.IsNullOrWhiteSpace(name) || !DateOnly.TryParse(startsInput, out startsOn) || !DateOnly.TryParse(endsInput, out endsOn))
+        {
+            error = "Nombre, fecha de inicio y fecha de fin son obligatorios.";
+            return false;
+        }
+
+        if (endsOn < startsOn)
+        {
+            error = "La fecha de fin no puede ser anterior al inicio.";
+            return false;
+        }
+
+        error = string.Empty;
+        return true;
+    }
+
+    private void SetMessage(string message, bool success)
+    {
+        statusMessage = message;
+        isSuccessMessage = success;
+    }
+
+    private static string LocationText(string region, string country)
+    {
+        if (string.IsNullOrWhiteSpace(region))
+        {
+            return country;
+        }
+
+        if (string.IsNullOrWhiteSpace(country))
+        {
+            return region;
+        }
+
+        return $"{region}, {country}";
+    }
+
+    private sealed record CompetitionItem(Guid Id, string Name, string SeasonName, string Format, int TeamCount);
+    private sealed record ParticipantItem(Guid ClubId, string ClubName, string? LogoPath, string TeamName);
+    private sealed record ClubOption(Guid Id, string Name);
+    private sealed record CompetitionOption(Guid Id, string Label);
+    private sealed record TeamOption(Guid Id, string Label);
+    private sealed class SeasonEditModel
+    {
+        public SeasonEditModel()
+        {
+        }
+
+        public SeasonEditModel(string name, string startsOn, string endsOn)
+        {
+            Name = name;
+            StartsOn = startsOn;
+            EndsOn = endsOn;
+        }
+
+        public string Name { get; set; } = string.Empty;
+        public string StartsOn { get; set; } = string.Empty;
+        public string EndsOn { get; set; } = string.Empty;
+    }
+
+    private sealed class CompetitionEditModel
+    {
+        public CompetitionEditModel()
+        {
+        }
+
+        public CompetitionEditModel(string name, string format)
+        {
+            Name = name;
+            Format = format;
+        }
+
+        public string Name { get; set; } = string.Empty;
+        public string Format { get; set; } = "League";
+    }
+}

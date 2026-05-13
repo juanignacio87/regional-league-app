@@ -1,7 +1,9 @@
 @page "/standings"
 @rendermode InteractiveServer
 @implements IDisposable
+@using Microsoft.EntityFrameworkCore
 @using RegionalLeagueApp.Application.Standings
+@inject ApplicationDbContext Db
 @inject IStandingsQueryService StandingsQueryService
 @inject MatchUpdatesClient MatchUpdatesClient
 
@@ -9,7 +11,7 @@
 
 <div class="page-heading">
     <p class="eyebrow">Standings</p>
-    <h1>Tabla de posiciones</h1>
+    <h1>@PageTitleText</h1>
 </div>
 
 @if (standings.Count == 0)
@@ -18,53 +20,73 @@
 }
 else
 {
-    <section class="panel table-panel standings-table">
-        <table>
-            <thead>
-                <tr>
-                    <th>Pos</th>
-                    <th>Club</th>
-                    <th>PJ</th>
-                    <th>PG</th>
-                    <th>PE</th>
-                    <th>PP</th>
-                    <th>GF</th>
-                    <th>GC</th>
-                    <th>DG</th>
-                    <th>PTS</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var row in standings)
-                {
-                    <tr class="@(row.Position == 1 ? "leader-row" : string.Empty)">
-                        <td><strong>@row.Position</strong></td>
-                        <td>
-                            <a class="standings-club-link" href="clubs/@row.ClubId">
-                                <ClubLogo Name="@row.ClubName" LogoPath="@row.ClubLogoPath" Class="club-logo-xs" />
-                                @row.ClubName
-                            </a>
-                        </td>
-                        <td>@row.Played</td>
-                        <td>@row.Won</td>
-                        <td>@row.Drawn</td>
-                        <td>@row.Lost</td>
-                        <td>@row.GoalsFor</td>
-                        <td>@row.GoalsAgainst</td>
-                        <td>@row.GoalDifference</td>
-                        <td><strong>@row.Points</strong></td>
+    @foreach (var group in standings.GroupBy(x => new { x.CompetitionId, x.CompetitionName }).OrderBy(x => x.Key.CompetitionName))
+    {
+        <section class="panel table-panel standings-table section-gap">
+            <div class="standings-section-title">
+                <h2>@group.Key.CompetitionName</h2>
+                <span>@group.Count() equipos</span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Pos</th>
+                        <th>Club</th>
+                        <th>PJ</th>
+                        <th>PG</th>
+                        <th>PE</th>
+                        <th>PP</th>
+                        <th>GF</th>
+                        <th>GC</th>
+                        <th>DG</th>
+                        <th>PTS</th>
                     </tr>
-                }
-            </tbody>
-        </table>
-    </section>
+                </thead>
+                <tbody>
+                    @foreach (var row in group.OrderBy(x => x.Position))
+                    {
+                        <tr class="@(row.Position == 1 ? "leader-row" : string.Empty)">
+                            <td><strong>@row.Position</strong></td>
+                            <td>
+                                <a class="standings-club-link" href="clubs/@row.ClubId">
+                                    <ClubLogo Name="@row.ClubName" LogoPath="@row.ClubLogoPath" Class="club-logo-xs" />
+                                    <span>
+                                        @row.ClubName
+                                        @if (standings.Select(x => x.ClubId).Distinct().Count() != standings.Count)
+                                        {
+                                            <small>@row.CompetitionName</small>
+                                        }
+                                    </span>
+                                </a>
+                            </td>
+                            <td>@row.Played</td>
+                            <td>@row.Won</td>
+                            <td>@row.Drawn</td>
+                            <td>@row.Lost</td>
+                            <td>@row.GoalsFor</td>
+                            <td>@row.GoalsAgainst</td>
+                            <td>@row.GoalDifference</td>
+                            <td><strong>@row.Points</strong></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </section>
+    }
 }
 
 @code {
     private IReadOnlyList<StandingRowDto> standings = [];
     private Func<Task>? reloadHandler;
+    private string? leagueName;
 
-    protected override async Task OnInitializedAsync()
+    [SupplyParameterFromQuery] public Guid? LeagueId { get; set; }
+
+    private string PageTitleText => string.IsNullOrWhiteSpace(leagueName)
+        ? "Tabla de posiciones"
+        : $"Tabla de posiciones - {leagueName}";
+
+    protected override async Task OnParametersSetAsync()
     {
         await LoadAsync();
     }
@@ -95,6 +117,14 @@ else
 
     private async Task LoadAsync()
     {
-        standings = await StandingsQueryService.GetStandingsAsync();
+        leagueName = LeagueId is null
+            ? null
+            : await Db.Leagues
+                .AsNoTracking()
+                .Where(x => x.Id == LeagueId)
+                .Select(x => x.Name)
+                .FirstOrDefaultAsync();
+
+        standings = await StandingsQueryService.GetStandingsAsync(LeagueId);
     }
 }

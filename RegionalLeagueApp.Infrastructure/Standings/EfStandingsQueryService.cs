@@ -7,10 +7,23 @@ namespace RegionalLeagueApp.Infrastructure.Standings;
 
 public sealed class EfStandingsQueryService(ApplicationDbContext dbContext) : IStandingsQueryService
 {
-    public async Task<IReadOnlyList<StandingRowDto>> GetStandingsAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<StandingRowDto>> GetStandingsAsync(Guid? leagueId = null, CancellationToken cancellationToken = default)
     {
-        var teams = await dbContext.Teams
+        var teamsQuery = dbContext.Teams
             .AsNoTracking()
+            .Where(team =>
+                team.IsActive &&
+                team.Club!.IsActive &&
+                team.Competition!.IsActive &&
+                team.Competition.Season!.League!.IsActive)
+            .AsQueryable();
+
+        if (leagueId is not null)
+        {
+            teamsQuery = teamsQuery.Where(team => team.Competition!.Season!.LeagueId == leagueId);
+        }
+
+        var teams = await teamsQuery
             .Select(team => new
             {
                 team.Id,
@@ -23,12 +36,26 @@ public sealed class EfStandingsQueryService(ApplicationDbContext dbContext) : IS
             })
             .ToListAsync(cancellationToken);
 
-        var homeRows = dbContext.Matches
+        var matchesQuery = dbContext.Matches
             .AsNoTracking()
             .Where(match =>
                 match.Status == MatchStatus.Finished &&
                 match.HomeScore != null &&
-                match.AwayScore != null)
+                match.AwayScore != null &&
+                match.Competition!.IsActive &&
+                match.Competition.Season!.League!.IsActive &&
+                match.HomeTeam!.IsActive &&
+                match.HomeTeam.Club!.IsActive &&
+                match.AwayTeam!.IsActive &&
+                match.AwayTeam.Club!.IsActive);
+
+        if (leagueId is not null)
+        {
+            matchesQuery = matchesQuery.Where(match => match.Competition!.Season!.LeagueId == leagueId);
+        }
+
+        var homeRows = matchesQuery
+            .AsNoTracking()
             .Select(match => new
             {
                 match.CompetitionId,
@@ -42,12 +69,8 @@ public sealed class EfStandingsQueryService(ApplicationDbContext dbContext) : IS
                 Points = match.HomeScore.Value > match.AwayScore.Value ? 3 : match.HomeScore.Value == match.AwayScore.Value ? 1 : 0
             });
 
-        var awayRows = dbContext.Matches
+        var awayRows = matchesQuery
             .AsNoTracking()
-            .Where(match =>
-                match.Status == MatchStatus.Finished &&
-                match.HomeScore != null &&
-                match.AwayScore != null)
             .Select(match => new
             {
                 match.CompetitionId,
@@ -104,26 +127,29 @@ public sealed class EfStandingsQueryService(ApplicationDbContext dbContext) : IS
                     goalsFor - goalsAgainst,
                     stat?.Points ?? 0);
             })
-            .OrderByDescending(row => row.Points)
-            .ThenByDescending(row => row.GoalDifference)
-            .ThenByDescending(row => row.GoalsFor)
-            .ThenBy(row => row.ClubName)
-            .Select((row, index) => new StandingRowDto(
-                index + 1,
-                row.CompetitionId,
-                row.CompetitionName,
-                row.TeamId,
-                row.ClubId,
-                row.ClubName,
-                row.ClubLogoPath,
-                row.Played,
-                row.Won,
-                row.Drawn,
-                row.Lost,
-                row.GoalsFor,
-                row.GoalsAgainst,
-                row.GoalDifference,
-                row.Points))
+            .GroupBy(row => row.CompetitionId)
+            .OrderBy(group => group.First().CompetitionName)
+            .SelectMany(group => group
+                .OrderByDescending(row => row.Points)
+                .ThenByDescending(row => row.GoalDifference)
+                .ThenByDescending(row => row.GoalsFor)
+                .ThenBy(row => row.ClubName)
+                .Select((row, index) => new StandingRowDto(
+                    index + 1,
+                    row.CompetitionId,
+                    row.CompetitionName,
+                    row.TeamId,
+                    row.ClubId,
+                    row.ClubName,
+                    row.ClubLogoPath,
+                    row.Played,
+                    row.Won,
+                    row.Drawn,
+                    row.Lost,
+                    row.GoalsFor,
+                    row.GoalsAgainst,
+                    row.GoalDifference,
+                    row.Points)))
             .ToList();
     }
 

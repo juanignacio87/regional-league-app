@@ -1,0 +1,15 @@
+<nav class="page-context" aria-label="Navegacion contextual">
+    <a class="page-context__back" href="@BackHref">&larr; Volver</a>
+    <div class="breadcrumb-trail">
+        <a href="@ParentHref">@ParentLabel</a>
+        <span>/</span>
+        <span>@CurrentLabel</span>
+    </div>
+</nav>
+
+@code {
+    [Parameter] public string BackHref { get; set; } = "/";
+    [Parameter] public string ParentHref { get; set; } = "/";
+    [Parameter] public string ParentLabel { get; set; } = string.Empty;
+    [Parameter] public string CurrentLabel { get; set; } = string.Empty;
+}

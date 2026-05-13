@@ -13,6 +13,8 @@
 }
 else
 {
+    <PageBreadcrumb BackHref="/scorers" ParentHref="/scorers" ParentLabel="Goleadores" CurrentLabel="@player.DisplayName" />
+
     <section class="player-profile-hero">
         <div class="player-profile-avatar">@Initials(player.DisplayName)</div>
         <div>
@@ -128,7 +130,7 @@ else
         player = await Db.Players
             .AsNoTracking()
             .Include(x => x.Team)!.ThenInclude(x => x!.Club)
-            .FirstOrDefaultAsync(x => x.Id == Id);
+            .FirstOrDefaultAsync(x => x.Id == Id && x.IsActive && x.Team!.IsActive && x.Team.Club!.IsActive);
 
         if (player is null)
         {

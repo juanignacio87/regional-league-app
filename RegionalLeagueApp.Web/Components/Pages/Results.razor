@@ -9,7 +9,7 @@
 
 <div class="page-heading">
     <p class="eyebrow">Resultados</p>
-    <h1>Partidos finalizados</h1>
+    <h1>@PageTitleText</h1>
 </div>
 
 @if (matches.Count == 0)
@@ -18,7 +18,7 @@
 }
 else
 {
-    @foreach (var group in matches.GroupBy(x => x.Round?.Name ?? "Sin fecha"))
+    @foreach (var group in matches.GroupBy(x => $"{x.Competition?.Name ?? "Competencia"} - {x.Round?.Name ?? "Sin fecha"}"))
     {
         <section class="panel section-gap">
             <h2>@group.Key</h2>
@@ -35,8 +35,15 @@ else
 @code {
     private List<Match> matches = [];
     private Func<Task>? reloadHandler;
+    private string? leagueName;
 
-    protected override async Task OnInitializedAsync()
+    [SupplyParameterFromQuery] public Guid? LeagueId { get; set; }
+
+    private string PageTitleText => string.IsNullOrWhiteSpace(leagueName)
+        ? "Partidos finalizados"
+        : $"Resultados - {leagueName}";
+
+    protected override async Task OnParametersSetAsync()
     {
         await LoadAsync();
     }
@@ -67,12 +74,35 @@ else
 
     private async Task LoadAsync()
     {
-        matches = await Db.Matches
+        leagueName = LeagueId is null
+            ? null
+            : await Db.Leagues
+                .AsNoTracking()
+                .Where(x => x.Id == LeagueId)
+                .Select(x => x.Name)
+                .FirstOrDefaultAsync();
+
+        var query = Db.Matches
             .AsNoTracking()
+            .Include(x => x.Competition)!.ThenInclude(x => x!.Season)
             .Include(x => x.Round)
             .Include(x => x.HomeTeam)!.ThenInclude(x => x!.Club)
             .Include(x => x.AwayTeam)!.ThenInclude(x => x!.Club)
-            .Where(x => x.Status == MatchStatus.Finished)
+            .Where(x =>
+                x.Status == MatchStatus.Finished &&
+                x.Competition!.IsActive &&
+                x.Competition.Season!.League!.IsActive &&
+                x.HomeTeam!.IsActive &&
+                x.HomeTeam.Club!.IsActive &&
+                x.AwayTeam!.IsActive &&
+                x.AwayTeam.Club!.IsActive);
+
+        if (LeagueId is not null)
+        {
+            query = query.Where(x => x.Competition!.Season!.LeagueId == LeagueId);
+        }
+
+        matches = await query
             .OrderByDescending(x => x.StartsAt)
             .ToListAsync();
     }

@@ -12,6 +12,8 @@ public sealed class Club : Entity
     public int? FoundedYear { get; private set; }
     public Guid? VenueId { get; private set; }
     public Venue? Venue { get; private set; }
+    public bool IsActive { get; private set; } = true;
+    public DateTime? ArchivedAt { get; private set; }
     public List<Team> Teams { get; private set; } = [];
     public List<ClubContributor> Contributors { get; private set; } = [];
 
@@ -26,6 +28,21 @@ public sealed class Club : Entity
         PrimaryColor = primaryColor;
         FoundedYear = foundedYear;
         VenueId = venueId;
+    }
+
+    public void UpdateDetails(string name, string shortName, string? primaryColor, int? foundedYear, Guid? venueId)
+    {
+        Name = name;
+        ShortName = shortName;
+        PrimaryColor = primaryColor;
+        FoundedYear = foundedYear;
+        VenueId = venueId;
+    }
+
+    public void SetActive(bool isActive)
+    {
+        IsActive = isActive;
+        ArchivedAt = isActive ? null : DateTime.UtcNow;
     }
 
     public void SetLogoPath(string? logoPath)

@@ -87,7 +87,12 @@ else
     {
         var goalEvents = await Db.MatchEvents
             .AsNoTracking()
-            .Where(x => x.Type == MatchEventType.Goal && (x.PlayerId != null || x.PlayerName != string.Empty))
+            .Where(x =>
+                x.Type == MatchEventType.Goal &&
+                (x.PlayerId != null || x.PlayerName != string.Empty) &&
+                x.Team!.IsActive &&
+                x.Team.Club!.IsActive &&
+                (x.Player == null || x.Player.IsActive))
             .Select(x => new
             {
                 x.PlayerId,

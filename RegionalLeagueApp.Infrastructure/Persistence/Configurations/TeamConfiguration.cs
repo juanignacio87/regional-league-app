@@ -12,6 +12,8 @@ public sealed class TeamConfiguration : IEntityTypeConfiguration<Team>
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Name).HasMaxLength(150).IsRequired();
         builder.Property(x => x.Category).HasMaxLength(60).IsRequired();
+        builder.Property(x => x.IsActive).IsRequired();
+        builder.Property(x => x.ArchivedAt);
         builder.HasIndex(x => new { x.CompetitionId, x.ClubId }).IsUnique();
         builder.HasIndex(x => new { x.CompetitionId, x.Name }).IsUnique();
 
