@@ -60,9 +60,28 @@ else
                 </div>
             </div>
 
-            <div class="league-ops-grid admin-league-forms">
-                <section class="league-ops-card">
-                    <h2>Crear temporada</h2>
+            <div class="admin-league-sections">
+                <section class="league-ops-card admin-league-panel">
+                    <div class="admin-league-panel__header">
+                        <div>
+                            <p class="eyebrow">Liga -> Temporadas</p>
+                            <h2>Temporadas</h2>
+                        </div>
+                        <span>@DisplaySeasons.Count cargada(s)</span>
+                    </div>
+                    <div class="admin-compact-list">
+                        @if (DisplaySeasons.Count == 0)
+                        {
+                            <span>No hay temporadas cargadas.</span>
+                        }
+                        else
+                        {
+                            @foreach (var season in DisplaySeasons.Take(4))
+                            {
+                                <span>@season.Name</span>
+                            }
+                        }
+                    </div>
                     <div class="league-ops-form">
                         <label>Nombre <input class="form-control" value="@newSeasonName" @oninput="e => newSeasonName = e.Value?.ToString() ?? string.Empty" maxlength="120" /></label>
                         <label>Inicio <input class="form-control" type="date" value="@newSeasonStartsOn" @oninput="e => newSeasonStartsOn = e.Value?.ToString() ?? string.Empty" /></label>
@@ -72,8 +91,27 @@ else
                     </div>
                 </section>
 
-                <section class="league-ops-card">
-                    <h2>Crear competencia</h2>
+                <section class="league-ops-card admin-league-panel">
+                    <div class="admin-league-panel__header">
+                        <div>
+                            <p class="eyebrow">Temporadas -> Competencias</p>
+                            <h2>Competencias</h2>
+                        </div>
+                        <span>@competitions.Count cargada(s)</span>
+                    </div>
+                    <div class="admin-compact-list">
+                        @if (competitions.Count == 0)
+                        {
+                            <span>No hay competencias cargadas.</span>
+                        }
+                        else
+                        {
+                            @foreach (var competition in competitions.Take(4))
+                            {
+                                <span>@competition.SeasonName - @competition.Name</span>
+                            }
+                        }
+                    </div>
                     <div class="league-ops-form">
                         <label>
                             Temporada
@@ -92,8 +130,27 @@ else
                     </div>
                 </section>
 
-                <section class="league-ops-card">
-                    <h2>Agregar equipo</h2>
+                <section class="league-ops-card admin-league-panel">
+                    <div class="admin-league-panel__header">
+                        <div>
+                            <p class="eyebrow">Competencias -> Equipos</p>
+                            <h2>Equipos participantes</h2>
+                        </div>
+                        <span>@participants.Count participante(s)</span>
+                    </div>
+                    <div class="admin-compact-list">
+                        @if (participants.Count == 0)
+                        {
+                            <span>No hay equipos asociados.</span>
+                        }
+                        else
+                        {
+                            @foreach (var participant in participants.Take(5))
+                            {
+                                <span>@participant.ClubName - @participant.TeamName</span>
+                            }
+                        }
+                    </div>
                     <div class="league-ops-form">
                         <label>
                             Competencia
@@ -121,10 +178,17 @@ else
                     </div>
                 </section>
 
-                <section class="league-ops-card">
-                    <h2>Crear partido</h2>
-                    <div class="league-ops-form">
-                        <label>
+                <section class="league-ops-card admin-fixture-card admin-league-panel">
+                    <div class="admin-fixture-card__header">
+                        <div>
+                            <p class="eyebrow">Equipos -> Partidos</p>
+                            <h2>Cargar fixture manual</h2>
+                            <p>Flujo principal para ligas con calendario existente. El fixture automatico quedara como herramienta opcional futura.</p>
+                        </div>
+                    </div>
+
+                    <div class="league-ops-form admin-fixture-form">
+                        <label class="admin-fixture-field admin-fixture-field--competition">
                             Competencia
                             <select class="form-control" @bind="newMatchCompetitionId" @bind:after="OnMatchCompetitionChangedAsync">
                                 <option value="">Seleccionar</option>
@@ -134,29 +198,114 @@ else
                                 }
                             </select>
                         </label>
-                        <label>Jornada <input class="form-control" value="@newMatchRoundName" @oninput="e => newMatchRoundName = e.Value?.ToString() ?? string.Empty" maxlength="100" /></label>
-                        <label>Fecha/hora <input class="form-control" type="datetime-local" value="@newMatchStartsAt" @oninput="e => newMatchStartsAt = e.Value?.ToString() ?? string.Empty" /></label>
-                        <label>
+                        <label class="admin-fixture-field admin-fixture-field--round">Jornada <input class="form-control" value="@newMatchRoundName" @oninput="OnMatchRoundInput" maxlength="100" placeholder="Fecha 1" /></label>
+                        <label class="admin-fixture-field admin-fixture-field--datetime">Fecha/hora <input class="form-control" type="datetime-local" value="@newMatchStartsAt" @oninput="e => newMatchStartsAt = e.Value?.ToString() ?? string.Empty" /></label>
+                        <label class="admin-fixture-field admin-fixture-field--team">
                             Local
                             <select class="form-control" @bind="newMatchHomeTeamId">
                                 <option value="">Seleccionar</option>
-                                @foreach (var team in matchTeamOptions)
+                                @foreach (var team in AvailableHomeTeamOptions)
                                 {
                                     <option value="@team.Id">@team.Label</option>
                                 }
                             </select>
                         </label>
-                        <label>
+                        <label class="admin-fixture-field admin-fixture-field--team">
                             Visitante
                             <select class="form-control" @bind="newMatchAwayTeamId">
                                 <option value="">Seleccionar</option>
-                                @foreach (var team in matchTeamOptions)
+                                @foreach (var team in AvailableAwayTeamOptions)
                                 {
                                     <option value="@team.Id">@team.Label</option>
                                 }
                             </select>
                         </label>
-                        <button class="leagues-button" type="button" disabled="@isSaving" @onclick="CreateMatchAsync">Crear partido</button>
+                        <button class="leagues-button admin-fixture-submit" type="button" disabled="@isSaving" @onclick="CreateMatchAsync">Crear partido</button>
+                    </div>
+
+                    <div class="admin-fixture-existing">
+                        <div class="admin-fixture-existing__title">
+                            <h3>Partidos cargados</h3>
+                            <span>@SelectedCompetitionLabel</span>
+                        </div>
+
+                        @if (newMatchCompetitionId is null)
+                        {
+                            <EmptyState Text="Selecciona una competencia para ver sus partidos." />
+                        }
+                        else if (SelectedCompetitionMatches.Count == 0)
+                        {
+                            <EmptyState Text="Todavia no hay partidos cargados para esta competencia." />
+                        }
+                        else
+                        {
+                            <div class="admin-fixture-rounds">
+                                @foreach (var group in SelectedCompetitionMatchGroups)
+                                {
+                                    <section class="admin-fixture-round">
+                                        <h4>@group.Key</h4>
+                                        <div class="admin-fixture-list">
+                                            @foreach (var match in group)
+                                            {
+                                                var edit = GetMatchEdit(match);
+                                                <article class="admin-fixture-row">
+                                                    @if (editingMatchId == match.Id)
+                                                    {
+                                                        <div class="admin-fixture-edit">
+                                                            <label>Jornada <input class="form-control" value="@edit.RoundName" @oninput="e => edit.RoundName = e.Value?.ToString() ?? string.Empty" maxlength="100" /></label>
+                                                            <label>Fecha/hora <input class="form-control" type="datetime-local" value="@edit.StartsAt" @oninput="e => edit.StartsAt = e.Value?.ToString() ?? string.Empty" /></label>
+                                                            <label>
+                                                                Local
+                                                                <select class="form-control" @bind="edit.HomeTeamId">
+                                                                    @foreach (var team in matchTeamOptions)
+                                                                    {
+                                                                        <option value="@team.Id">@team.Label</option>
+                                                                    }
+                                                                </select>
+                                                            </label>
+                                                            <label>
+                                                                Visitante
+                                                                <select class="form-control" @bind="edit.AwayTeamId">
+                                                                    @foreach (var team in matchTeamOptions)
+                                                                    {
+                                                                        <option value="@team.Id">@team.Label</option>
+                                                                    }
+                                                                </select>
+                                                            </label>
+                                                            <label>
+                                                                Estado
+                                                                <select class="form-control" @bind="edit.Status">
+                                                                    @foreach (var status in Enum.GetValues<MatchStatus>())
+                                                                    {
+                                                                        <option value="@status">@status</option>
+                                                                    }
+                                                                </select>
+                                                            </label>
+                                                        </div>
+                                                        <div class="admin-fixture-actions">
+                                                            <button type="button" class="admin-link-button" disabled="@isSaving" @onclick="() => SaveMatchAsync(match.Id)">Guardar</button>
+                                                            <button type="button" class="admin-link-button admin-link-button-muted" disabled="@isSaving" @onclick="CancelMatchEdit">Cancelar edicion</button>
+                                                        </div>
+                                                    }
+                                                    else
+                                                    {
+                                                        <a class="admin-fixture-row__summary" href="/matches/@match.Id">
+                                                            <span>@(match.Round?.Name ?? "Fecha")</span>
+                                                            <strong>@(match.HomeTeam?.Club?.ShortName ?? "LOC") vs @(match.AwayTeam?.Club?.ShortName ?? "VIS")</strong>
+                                                            <small>@match.StartsAt.LocalDateTime.ToString("dd/MM/yyyy HH:mm") - @match.Status</small>
+                                                        </a>
+                                                        <div class="admin-fixture-actions">
+                                                            <button type="button" class="admin-link-button" disabled="@isSaving" @onclick="() => BeginMatchEdit(match)">Editar</button>
+                                                            <button type="button" class="admin-link-button admin-link-button-muted" disabled="@isSaving" @onclick="() => CancelExistingMatchAsync(match.Id)">Marcar cancelado</button>
+                                                        </div>
+                                                    }
+                                                </article>
+                                            }
+                                        </div>
+                                    </section>
+                                }
+                            </div>
+                        }
                     </div>
                 </section>
             </div>
@@ -277,9 +426,11 @@ else
     private List<TeamOption> matchTeamOptions = [];
     private readonly Dictionary<Guid, SeasonEditModel> seasonEdits = [];
     private readonly Dictionary<Guid, CompetitionEditModel> competitionEdits = [];
+    private readonly Dictionary<Guid, MatchEditModel> matchEdits = [];
     private bool canManage;
     private bool isSaving;
     private bool isSuccessMessage;
+    private Guid? editingMatchId;
     private string? statusMessage;
     private string newSeasonName = string.Empty;
     private string newSeasonStartsOn = string.Empty;
@@ -304,6 +455,52 @@ else
         .OrderByDescending(x => x.IsActive)
         .ThenByDescending(x => x.StartsOn)
         .ToList() ?? [];
+
+    private List<Match> SelectedCompetitionMatches => newMatchCompetitionId is null || league is null
+        ? []
+        : league.Seasons
+            .SelectMany(x => x.Competitions)
+            .Where(x => x.Id == newMatchCompetitionId)
+            .SelectMany(x => x.Matches)
+            .OrderBy(x => x.StartsAt)
+            .ThenBy(x => x.HomeTeam?.Club?.Name ?? string.Empty)
+            .ToList();
+
+    private IEnumerable<IGrouping<string, Match>> SelectedCompetitionMatchGroups => SelectedCompetitionMatches
+        .GroupBy(x => x.Round?.Name ?? "Fecha")
+        .OrderBy(x => x.Min(match => match.StartsAt));
+
+    private string SelectedCompetitionLabel => newMatchCompetitionId is null
+        ? "Sin competencia seleccionada"
+        : competitionOptions.FirstOrDefault(x => x.Id == newMatchCompetitionId)?.Label ?? "Competencia seleccionada";
+
+    private List<TeamOption> AvailableHomeTeamOptions => matchTeamOptions
+        .Where(team => !OccupiedTeamIdsForSelectedRound.Contains(team.Id) && team.Id != newMatchAwayTeamId)
+        .ToList();
+
+    private List<TeamOption> AvailableAwayTeamOptions => matchTeamOptions
+        .Where(team => !OccupiedTeamIdsForSelectedRound.Contains(team.Id) && team.Id != newMatchHomeTeamId)
+        .ToList();
+
+    private HashSet<Guid> OccupiedTeamIdsForSelectedRound
+    {
+        get
+        {
+            var roundName = MatchRoundName();
+            if (newMatchCompetitionId is null || string.IsNullOrWhiteSpace(roundName) || league is null)
+            {
+                return [];
+            }
+
+            return league.Seasons
+                .SelectMany(x => x.Competitions)
+                .Where(x => x.Id == newMatchCompetitionId)
+                .SelectMany(x => x.Matches)
+                .Where(x => string.Equals(x.Round?.Name, roundName, StringComparison.OrdinalIgnoreCase))
+                .SelectMany(x => new[] { x.HomeTeamId, x.AwayTeamId })
+                .ToHashSet();
+        }
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -391,6 +588,17 @@ else
         foreach (var competition in league?.Seasons.SelectMany(x => x.Competitions) ?? [])
         {
             competitionEdits[competition.Id] = new CompetitionEditModel(competition.Name, competition.Format);
+        }
+
+        matchEdits.Clear();
+        foreach (var match in league?.Seasons.SelectMany(x => x.Competitions).SelectMany(x => x.Matches) ?? [])
+        {
+            matchEdits[match.Id] = new MatchEditModel(
+                match.Round?.Name ?? "Fecha 1",
+                match.StartsAt.LocalDateTime.ToString("yyyy-MM-ddTHH:mm"),
+                match.HomeTeamId,
+                match.AwayTeamId,
+                match.Status);
         }
     }
 
@@ -574,6 +782,26 @@ else
         await LoadMatchTeamOptionsAsync();
     }
 
+    private void OnMatchRoundInput(ChangeEventArgs args)
+    {
+        newMatchRoundName = args.Value?.ToString() ?? string.Empty;
+        ClearUnavailableMatchTeams();
+    }
+
+    private void ClearUnavailableMatchTeams()
+    {
+        var occupiedTeamIds = OccupiedTeamIdsForSelectedRound;
+        if (newMatchHomeTeamId is not null && occupiedTeamIds.Contains(newMatchHomeTeamId.Value))
+        {
+            newMatchHomeTeamId = null;
+        }
+
+        if (newMatchAwayTeamId is not null && occupiedTeamIds.Contains(newMatchAwayTeamId.Value))
+        {
+            newMatchAwayTeamId = null;
+        }
+    }
+
     private async Task LoadMatchTeamOptionsAsync()
     {
         matchTeamOptions = newMatchCompetitionId is null
@@ -624,6 +852,13 @@ else
             return;
         }
 
+        var roundName = MatchRoundName();
+        if (await TeamAlreadyPlaysInRoundAsync(newMatchCompetitionId.Value, roundName, newMatchHomeTeamId.Value, newMatchAwayTeamId.Value, null))
+        {
+            SetMessage("Un equipo no puede jugar mas de un partido en la misma jornada de la competencia.", false);
+            return;
+        }
+
         var startsAt = new DateTimeOffset(DateTime.SpecifyKind(startsAtLocal, DateTimeKind.Local)).ToUniversalTime();
         var duplicateMatch = await Db.Matches.AnyAsync(x =>
             x.CompetitionId == newMatchCompetitionId &&
@@ -636,7 +871,6 @@ else
             return;
         }
 
-        var roundName = string.IsNullOrWhiteSpace(newMatchRoundName) ? "Fecha 1" : newMatchRoundName.Trim();
         var round = await Db.Rounds.FirstOrDefaultAsync(x => x.CompetitionId == newMatchCompetitionId && x.Name == roundName);
         if (round is null)
         {
@@ -650,7 +884,8 @@ else
 
         Db.Matches.Add(new Match(newMatchCompetitionId.Value, round.Id, newMatchHomeTeamId.Value, newMatchAwayTeamId.Value, startsAt, status: MatchStatus.Scheduled));
         await Db.SaveChangesAsync();
-        newMatchRoundName = string.Empty;
+        newMatchHomeTeamId = null;
+        newMatchAwayTeamId = null;
         newMatchStartsAt = string.Empty;
         SetMessage("Partido creado correctamente.", true);
         await LoadAsync();
@@ -658,6 +893,161 @@ else
 
     private SeasonEditModel GetSeasonEdit(Guid seasonId) => seasonEdits.TryGetValue(seasonId, out var edit) ? edit : new SeasonEditModel();
     private CompetitionEditModel GetCompetitionEdit(Guid competitionId) => competitionEdits.TryGetValue(competitionId, out var edit) ? edit : new CompetitionEditModel();
+    private MatchEditModel GetMatchEdit(Match match) => matchEdits.TryGetValue(match.Id, out var edit)
+        ? edit
+        : new MatchEditModel(match.Round?.Name ?? "Fecha 1", match.StartsAt.LocalDateTime.ToString("yyyy-MM-ddTHH:mm"), match.HomeTeamId, match.AwayTeamId, match.Status);
+
+    private string MatchRoundName() => string.IsNullOrWhiteSpace(newMatchRoundName) ? "Fecha 1" : newMatchRoundName.Trim();
+
+    private void BeginMatchEdit(Match match)
+    {
+        newMatchCompetitionId = match.CompetitionId;
+        editingMatchId = match.Id;
+        matchEdits[match.Id] = new MatchEditModel(
+            match.Round?.Name ?? "Fecha 1",
+            match.StartsAt.LocalDateTime.ToString("yyyy-MM-ddTHH:mm"),
+            match.HomeTeamId,
+            match.AwayTeamId,
+            match.Status);
+    }
+
+    private void CancelMatchEdit()
+    {
+        editingMatchId = null;
+    }
+
+    private async Task SaveMatchAsync(Guid matchId)
+    {
+        if (newMatchCompetitionId is null || !matchEdits.TryGetValue(matchId, out var edit))
+        {
+            SetMessage("No se encontro la edicion del partido.", false);
+            return;
+        }
+
+        var validation = await ValidateMatchEditAsync(newMatchCompetitionId.Value, edit, matchId);
+        if (validation is not null)
+        {
+            SetMessage(validation, false);
+            return;
+        }
+
+        var match = await Db.Matches.FirstOrDefaultAsync(x => x.Id == matchId && x.CompetitionId == newMatchCompetitionId);
+        if (match is null)
+        {
+            SetMessage("Partido no encontrado.", false);
+            return;
+        }
+
+        var roundName = string.IsNullOrWhiteSpace(edit.RoundName) ? "Fecha 1" : edit.RoundName.Trim();
+        var round = await FindOrCreateRoundAsync(newMatchCompetitionId.Value, roundName);
+        var startsAt = ToUtc(edit.StartsAt);
+
+        isSaving = true;
+        try
+        {
+            Db.Entry(match).Property(x => x.RoundId).CurrentValue = round.Id;
+            Db.Entry(match).Property(x => x.HomeTeamId).CurrentValue = edit.HomeTeamId;
+            Db.Entry(match).Property(x => x.AwayTeamId).CurrentValue = edit.AwayTeamId;
+            Db.Entry(match).Property(x => x.StartsAt).CurrentValue = startsAt;
+            Db.Entry(match).Property(x => x.Status).CurrentValue = edit.Status;
+            await Db.SaveChangesAsync();
+            editingMatchId = null;
+            SetMessage("Partido actualizado correctamente.", true);
+            await LoadAsync();
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task CancelExistingMatchAsync(Guid matchId)
+    {
+        var match = await Db.Matches.FirstOrDefaultAsync(x => x.Id == matchId);
+        if (match is null)
+        {
+            SetMessage("Partido no encontrado.", false);
+            return;
+        }
+
+        Db.Entry(match).Property(x => x.Status).CurrentValue = MatchStatus.Cancelled;
+        await Db.SaveChangesAsync();
+        SetMessage("Partido marcado como cancelado.", true);
+        await LoadAsync();
+    }
+
+    private async Task<string?> ValidateMatchEditAsync(Guid competitionId, MatchEditModel edit, Guid currentMatchId)
+    {
+        if (edit.HomeTeamId == edit.AwayTeamId)
+        {
+            return "Local y visitante deben ser distintos.";
+        }
+
+        if (!DateTime.TryParse(edit.StartsAt, out _))
+        {
+            return "Fecha/hora de partido invalida.";
+        }
+
+        var teamIds = await Db.Teams
+            .AsNoTracking()
+            .Where(x => x.CompetitionId == competitionId && x.IsActive && x.Club!.IsActive)
+            .Select(x => x.Id)
+            .ToListAsync();
+        if (!teamIds.Contains(edit.HomeTeamId) || !teamIds.Contains(edit.AwayTeamId))
+        {
+            return "Ambos equipos deben estar activos y pertenecer a la competencia.";
+        }
+
+        var roundName = string.IsNullOrWhiteSpace(edit.RoundName) ? "Fecha 1" : edit.RoundName.Trim();
+        if (await TeamAlreadyPlaysInRoundAsync(competitionId, roundName, edit.HomeTeamId, edit.AwayTeamId, currentMatchId))
+        {
+            return "Un equipo no puede jugar mas de un partido en la misma jornada de la competencia.";
+        }
+
+        var startsAt = ToUtc(edit.StartsAt);
+        var duplicateMatch = await Db.Matches.AnyAsync(x =>
+            x.CompetitionId == competitionId &&
+            x.Id != currentMatchId &&
+            x.HomeTeamId == edit.HomeTeamId &&
+            x.AwayTeamId == edit.AwayTeamId &&
+            x.StartsAt == startsAt);
+        return duplicateMatch ? "Ya existe un partido con el mismo local, visitante y fecha/hora." : null;
+    }
+
+    private async Task<bool> TeamAlreadyPlaysInRoundAsync(Guid competitionId, string roundName, Guid homeTeamId, Guid awayTeamId, Guid? currentMatchId)
+    {
+        return await Db.Matches.AnyAsync(x =>
+            x.CompetitionId == competitionId &&
+            (currentMatchId == null || x.Id != currentMatchId.Value) &&
+            x.Round!.Name == roundName &&
+            (x.HomeTeamId == homeTeamId ||
+             x.AwayTeamId == homeTeamId ||
+             x.HomeTeamId == awayTeamId ||
+             x.AwayTeamId == awayTeamId));
+    }
+
+    private async Task<Round> FindOrCreateRoundAsync(Guid competitionId, string roundName)
+    {
+        var round = await Db.Rounds.FirstOrDefaultAsync(x => x.CompetitionId == competitionId && x.Name == roundName);
+        if (round is not null)
+        {
+            return round;
+        }
+
+        var nextSortOrder = await Db.Rounds
+            .Where(x => x.CompetitionId == competitionId)
+            .Select(x => (int?)x.SortOrder)
+            .MaxAsync() ?? 0;
+        round = new Round(competitionId, roundName, nextSortOrder + 1);
+        Db.Rounds.Add(round);
+        return round;
+    }
+
+    private static DateTimeOffset ToUtc(string localDateTime)
+    {
+        var parsed = DateTime.Parse(localDateTime);
+        return new DateTimeOffset(DateTime.SpecifyKind(parsed, DateTimeKind.Local)).ToUniversalTime();
+    }
 
     private static bool TryParseSeason(string nameInput, string startsInput, string endsInput, out string name, out DateOnly startsOn, out DateOnly endsOn, out string error)
     {
@@ -706,6 +1096,24 @@ else
     private sealed record ClubOption(Guid Id, string Name);
     private sealed record CompetitionOption(Guid Id, string Label);
     private sealed record TeamOption(Guid Id, string Label);
+    private sealed class MatchEditModel
+    {
+        public MatchEditModel(string roundName, string startsAt, Guid homeTeamId, Guid awayTeamId, MatchStatus status)
+        {
+            RoundName = roundName;
+            StartsAt = startsAt;
+            HomeTeamId = homeTeamId;
+            AwayTeamId = awayTeamId;
+            Status = status;
+        }
+
+        public string RoundName { get; set; }
+        public string StartsAt { get; set; }
+        public Guid HomeTeamId { get; set; }
+        public Guid AwayTeamId { get; set; }
+        public MatchStatus Status { get; set; }
+    }
+
     private sealed class SeasonEditModel
     {
         public SeasonEditModel()

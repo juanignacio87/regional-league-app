@@ -1125,20 +1125,185 @@ p {
     padding-bottom: .75rem;
 }
 
-.admin-league-forms {
-    grid-template-columns: repeat(4, minmax(220px, 1fr));
-    margin-top: 0;
+.admin-league-sections {
+    display: grid;
+    gap: .85rem;
 }
 
-.admin-league-forms .league-ops-card {
-    padding: .75rem;
+.admin-league-panel {
+    display: grid;
+    gap: .75rem;
+    padding: .8rem;
 }
 
-.admin-league-forms .league-ops-card h2 {
+.admin-league-panel__header {
+    align-items: start;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+}
+
+.admin-league-panel__header h2 {
     font-size: 1rem;
+    margin: 0;
 }
 
-.admin-league-forms .form-control,
+.admin-league-panel__header span {
+    background: #e6f3ef;
+    border-radius: 999px;
+    color: #0f4f43;
+    font-size: .8rem;
+    font-weight: 900;
+    padding: .3rem .55rem;
+    white-space: nowrap;
+}
+
+.admin-compact-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+}
+
+.admin-compact-list span {
+    background: #fff;
+    border: 1px solid #edf2f0;
+    border-radius: 999px;
+    color: #60716d;
+    font-size: .8rem;
+    font-weight: 800;
+    padding: .3rem .55rem;
+}
+
+.admin-league-panel > .league-ops-form {
+    align-items: end;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.admin-fixture-card__header {
+    align-items: start;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    margin-bottom: .75rem;
+}
+
+.admin-fixture-card__header p {
+    color: #60716d;
+    margin: .2rem 0 0;
+}
+
+.admin-fixture-form {
+    align-items: end;
+    display: grid;
+    gap: .75rem;
+    grid-template-columns: minmax(220px, 1.2fr) minmax(120px, .6fr) minmax(190px, .9fr) repeat(2, minmax(200px, 1fr));
+}
+
+.admin-fixture-field {
+    min-width: 0;
+}
+
+.admin-fixture-field--team .form-control,
+.admin-fixture-field--datetime .form-control,
+.admin-fixture-field--competition .form-control {
+    min-width: 0;
+    width: 100%;
+}
+
+.admin-fixture-submit {
+    justify-self: start;
+    min-width: 140px;
+}
+
+.admin-fixture-existing {
+    border-top: 1px solid #edf2f0;
+    display: grid;
+    gap: .65rem;
+    margin-top: .85rem;
+    padding-top: .85rem;
+}
+
+.admin-fixture-existing__title {
+    align-items: center;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+}
+
+.admin-fixture-existing__title h3 {
+    font-size: 1rem;
+    margin: 0;
+}
+
+.admin-fixture-existing__title span {
+    color: #60716d;
+    font-size: .86rem;
+    font-weight: 800;
+}
+
+.admin-fixture-list {
+    display: grid;
+    gap: .45rem;
+}
+
+.admin-fixture-rounds,
+.admin-fixture-round {
+    display: grid;
+    gap: .65rem;
+}
+
+.admin-fixture-round h4 {
+    color: #40514d;
+    font-size: .95rem;
+    margin: .25rem 0 0;
+}
+
+.admin-fixture-row {
+    align-items: center;
+    background: #fff;
+    border: 1px solid #edf2f0;
+    border-radius: 8px;
+    display: grid;
+    gap: .75rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: .6rem;
+}
+
+.admin-fixture-row__summary {
+    color: inherit;
+    display: grid;
+    gap: .1rem;
+    text-decoration: none;
+}
+
+.admin-fixture-row__summary span,
+.admin-fixture-row__summary small {
+    color: #60716d;
+}
+
+.admin-fixture-edit {
+    align-items: end;
+    display: grid;
+    gap: .5rem;
+    grid-template-columns: minmax(110px, .7fr) minmax(170px, 1fr) repeat(3, minmax(140px, 1fr));
+}
+
+.admin-fixture-edit label {
+    color: #40514d;
+    display: grid;
+    font-size: .82rem;
+    font-weight: 800;
+    gap: .25rem;
+}
+
+.admin-fixture-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+    justify-content: flex-end;
+}
+
+.admin-league-panel .form-control,
 .admin-league-structure .form-control {
     min-height: 2.25rem;
     padding-block: .45rem;
@@ -2297,9 +2462,30 @@ p {
         justify-content: flex-start;
     }
 
-    .admin-league-forms,
-    .admin-league-structure .league-inline-edit {
+    .admin-league-panel > .league-ops-form,
+    .admin-league-structure .league-inline-edit,
+    .admin-fixture-form,
+    .admin-fixture-row,
+    .admin-fixture-edit {
         grid-template-columns: 1fr;
+    }
+
+    .admin-fixture-submit {
+        justify-self: stretch;
+        width: 100%;
+    }
+
+    .admin-league-panel__header {
+        display: grid;
+    }
+
+    .admin-fixture-existing__title {
+        align-items: flex-start;
+        display: grid;
+    }
+
+    .admin-fixture-actions {
+        justify-content: flex-start;
     }
 
     .clubs-edit-row,
