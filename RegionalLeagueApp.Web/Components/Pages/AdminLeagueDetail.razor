@@ -232,11 +232,37 @@ else
                             <span>@SelectedCompetitionLabel</span>
                         </div>
 
+                        @if (newMatchCompetitionId is not null && SelectedCompetitionMatches.Count > 0)
+                        {
+                            <div class="admin-fixture-filters">
+                                <label>
+                                    Estado
+                                    <select class="form-control" @bind="matchStatusFilter">
+                                        <option value="">Todos</option>
+                                        @foreach (var status in Enum.GetValues<MatchStatus>())
+                                        {
+                                            <option value="@status.ToString()">@status</option>
+                                        }
+                                    </select>
+                                </label>
+                                <label>
+                                    Jornada
+                                    <select class="form-control" @bind="matchRoundFilter">
+                                        <option value="">Todas</option>
+                                        @foreach (var round in MatchRoundOptions)
+                                        {
+                                            <option value="@round">@round</option>
+                                        }
+                                    </select>
+                                </label>
+                            </div>
+                        }
+
                         @if (newMatchCompetitionId is null)
                         {
                             <EmptyState Text="Selecciona una competencia para ver sus partidos." />
                         }
-                        else if (SelectedCompetitionMatches.Count == 0)
+                        else if (FilteredCompetitionMatches.Count == 0)
                         {
                             <EmptyState Text="Todavia no hay partidos cargados para esta competencia." />
                         }
@@ -245,9 +271,15 @@ else
                             <div class="admin-fixture-rounds">
                                 @foreach (var group in SelectedCompetitionMatchGroups)
                                 {
-                                    <section class="admin-fixture-round">
-                                        <h4>@group.Key</h4>
-                                        <div class="admin-fixture-list">
+                                    <details class="admin-fixture-round" open="@IsRoundOpen(group)">
+                                        <summary>
+                                            <div>
+                                                <h4>@group.Key</h4>
+                                                <span>@RoundDateRange(group)</span>
+                                            </div>
+                                            <strong>@group.Count() partido(s)</strong>
+                                        </summary>
+                                        <div class="admin-fixture-list" role="list">
                                             @foreach (var match in group)
                                             {
                                                 var edit = GetMatchEdit(match);
@@ -293,9 +325,11 @@ else
                                                     else
                                                     {
                                                         <a class="admin-fixture-row__summary" href="/matches/@match.Id">
-                                                            <span>@(match.Round?.Name ?? "Fecha")</span>
-                                                            <strong>@(match.HomeTeam?.Club?.ShortName ?? "LOC") vs @(match.AwayTeam?.Club?.ShortName ?? "VIS")</strong>
-                                                            <small>@match.StartsAt.LocalDateTime.ToString("dd/MM/yyyy HH:mm") - @match.Status</small>
+                                                            <time>@match.StartsAt.LocalDateTime.ToString("dd/MM HH:mm")</time>
+                                                            <strong>@(match.HomeTeam?.Club?.ShortName ?? "LOC")</strong>
+                                                            <span>vs</span>
+                                                            <strong>@(match.AwayTeam?.Club?.ShortName ?? "VIS")</strong>
+                                                            <small>@match.Status</small>
                                                         </a>
                                                         <div class="admin-fixture-actions">
                                                             <button type="button" class="admin-link-button" disabled="@isSaving" @onclick="() => BeginMatchEdit(match)">Editar</button>
@@ -305,7 +339,7 @@ else
                                                 </article>
                                             }
                                         </div>
-                                    </section>
+                                    </details>
                                 }
                             </div>
                         }
@@ -504,6 +538,8 @@ else
     private string newMatchRoundName = string.Empty;
     private string newMatchStartsAt = string.Empty;
     private string fixtureCsvInput = string.Empty;
+    private string matchStatusFilter = string.Empty;
+    private string matchRoundFilter = string.Empty;
     private FixtureCsvPreviewResult? fixtureCsvPreview;
 
     private List<Season> DisplaySeasons => league?.Seasons
@@ -522,9 +558,20 @@ else
             .ThenBy(x => x.HomeTeam?.Club?.Name ?? string.Empty)
             .ToList();
 
-    private IEnumerable<IGrouping<string, Match>> SelectedCompetitionMatchGroups => SelectedCompetitionMatches
+    private List<Match> FilteredCompetitionMatches => SelectedCompetitionMatches
+        .Where(x => string.IsNullOrWhiteSpace(matchStatusFilter) || x.Status.ToString() == matchStatusFilter)
+        .Where(x => string.IsNullOrWhiteSpace(matchRoundFilter) || (x.Round?.Name ?? "Fecha") == matchRoundFilter)
+        .ToList();
+
+    private IEnumerable<IGrouping<string, Match>> SelectedCompetitionMatchGroups => FilteredCompetitionMatches
         .GroupBy(x => x.Round?.Name ?? "Fecha")
         .OrderBy(x => x.Min(match => match.StartsAt));
+
+    private List<string> MatchRoundOptions => SelectedCompetitionMatches
+        .Select(x => x.Round?.Name ?? "Fecha")
+        .Distinct()
+        .OrderBy(x => RoundSortValue(x))
+        .ToList();
 
     private string SelectedCompetitionLabel => newMatchCompetitionId is null
         ? "Sin competencia seleccionada"
@@ -835,6 +882,8 @@ else
     {
         newMatchHomeTeamId = null;
         newMatchAwayTeamId = null;
+        matchStatusFilter = string.Empty;
+        matchRoundFilter = string.Empty;
         fixtureCsvPreview = null;
         await LoadMatchTeamOptionsAsync();
     }
@@ -1026,6 +1075,49 @@ else
         : new MatchEditModel(match.Round?.Name ?? "Fecha 1", match.StartsAt.LocalDateTime.ToString("yyyy-MM-ddTHH:mm"), match.HomeTeamId, match.AwayTeamId, match.Status);
 
     private string MatchRoundName() => string.IsNullOrWhiteSpace(newMatchRoundName) ? "Fecha 1" : newMatchRoundName.Trim();
+
+    private bool IsRoundOpen(IGrouping<string, Match> group)
+    {
+        if (editingMatchId is not null && group.Any(x => x.Id == editingMatchId))
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(matchRoundFilter))
+        {
+            return true;
+        }
+
+        var nextActiveGroup = SelectedCompetitionMatchGroups
+            .Where(x => x.Any(match => match.Status is MatchStatus.Scheduled or MatchStatus.Live or MatchStatus.HalfTime))
+            .OrderBy(x => x.Min(match => match.StartsAt))
+            .FirstOrDefault();
+
+        return nextActiveGroup is null
+            ? group == SelectedCompetitionMatchGroups.First()
+            : group.Key == nextActiveGroup.Key;
+    }
+
+    private static string RoundDateRange(IEnumerable<Match> matches)
+    {
+        var ordered = matches.OrderBy(x => x.StartsAt).ToList();
+        if (ordered.Count == 0)
+        {
+            return "Sin partidos";
+        }
+
+        var first = ordered.First().StartsAt.LocalDateTime;
+        var last = ordered.Last().StartsAt.LocalDateTime;
+        return first.Date == last.Date
+            ? first.ToString("dd/MM/yyyy")
+            : $"{first:dd/MM/yyyy} - {last:dd/MM/yyyy}";
+    }
+
+    private static int RoundSortValue(string roundName)
+    {
+        var digits = new string(roundName.Where(char.IsDigit).ToArray());
+        return int.TryParse(digits, out var value) ? value : int.MaxValue;
+    }
 
     private void BeginMatchEdit(Match match)
     {

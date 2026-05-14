@@ -1243,7 +1243,7 @@ p {
 
 .admin-fixture-list {
     display: grid;
-    gap: .45rem;
+    gap: .35rem;
 }
 
 .admin-fixture-rounds,
@@ -1252,10 +1252,60 @@ p {
     gap: .65rem;
 }
 
+.admin-fixture-filters {
+    align-items: end;
+    display: grid;
+    gap: .65rem;
+    grid-template-columns: repeat(2, minmax(180px, 240px));
+}
+
+.admin-fixture-filters label {
+    color: #40514d;
+    display: grid;
+    font-size: .82rem;
+    font-weight: 800;
+    gap: .3rem;
+}
+
+.admin-fixture-round {
+    background: #fbfdfc;
+    border: 1px solid #edf2f0;
+    border-radius: 8px;
+    padding: .55rem;
+}
+
+.admin-fixture-round summary {
+    align-items: center;
+    cursor: pointer;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    list-style: none;
+}
+
+.admin-fixture-round summary::-webkit-details-marker {
+    display: none;
+}
+
 .admin-fixture-round h4 {
     color: #40514d;
     font-size: .95rem;
-    margin: .25rem 0 0;
+    margin: 0;
+}
+
+.admin-fixture-round summary span {
+    color: #60716d;
+    display: block;
+    font-size: .8rem;
+    margin-top: .1rem;
+}
+
+.admin-fixture-round summary strong {
+    background: #e6f3ef;
+    border-radius: 999px;
+    color: #0f4f43;
+    font-size: .78rem;
+    padding: .3rem .55rem;
 }
 
 .admin-fixture-row {
@@ -1264,21 +1314,35 @@ p {
     border: 1px solid #edf2f0;
     border-radius: 8px;
     display: grid;
-    gap: .75rem;
+    gap: .5rem;
     grid-template-columns: minmax(0, 1fr) auto;
-    padding: .6rem;
+    padding: .45rem .55rem;
 }
 
 .admin-fixture-row__summary {
+    align-items: center;
     color: inherit;
     display: grid;
-    gap: .1rem;
+    gap: .5rem;
+    grid-template-columns: 90px minmax(90px, 1fr) 28px minmax(90px, 1fr) 90px;
     text-decoration: none;
 }
 
-.admin-fixture-row__summary span,
+.admin-fixture-row__summary time,
 .admin-fixture-row__summary small {
     color: #60716d;
+    font-size: .82rem;
+}
+
+.admin-fixture-row__summary span {
+    color: #94a3b8;
+    font-size: .78rem;
+    font-weight: 900;
+    text-align: center;
+}
+
+.admin-fixture-row__summary strong {
+    overflow-wrap: anywhere;
 }
 
 .admin-fixture-edit {
@@ -2607,6 +2671,15 @@ p {
 
     .admin-fixture-actions {
         justify-content: flex-start;
+    }
+
+    .admin-fixture-filters,
+    .admin-fixture-row__summary {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-fixture-row__summary span {
+        text-align: left;
     }
 
     .clubs-edit-row,
