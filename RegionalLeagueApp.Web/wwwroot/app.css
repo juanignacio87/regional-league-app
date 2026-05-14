@@ -1303,6 +1303,45 @@ p {
     justify-content: flex-end;
 }
 
+.admin-csv-import {
+    border-top: 1px solid #edf2f0;
+    display: grid;
+    gap: .75rem;
+    margin-top: .9rem;
+    padding-top: .9rem;
+}
+
+.admin-csv-import__input {
+    font-family: Consolas, "Liberation Mono", monospace;
+    min-height: 130px;
+    resize: vertical;
+}
+
+.admin-csv-import__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+}
+
+.admin-csv-preview {
+    overflow-x: auto;
+}
+
+.admin-csv-preview table {
+    min-width: 820px;
+}
+
+.admin-csv-preview--valid td:nth-child(6) {
+    color: #0f766e;
+    font-weight: 900;
+}
+
+.admin-csv-preview--error td:nth-child(6),
+.admin-csv-preview--duplicate td:nth-child(6) {
+    color: #be123c;
+    font-weight: 900;
+}
+
 .admin-league-panel .form-control,
 .admin-league-structure .form-control {
     min-height: 2.25rem;

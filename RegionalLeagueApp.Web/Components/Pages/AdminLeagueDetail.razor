@@ -2,8 +2,11 @@
 @rendermode InteractiveServer
 @attribute [Authorize(Roles = "Admin,Moderator")]
 @using Microsoft.EntityFrameworkCore
+@using RegionalLeagueApp.Application.Fixtures
 @inject ApplicationDbContext Db
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IFixtureCsvImportService FixtureCsvImportService
+@inject ILogger<AdminLeagueDetail> Logger
 
 <PageTitle>Administrar liga</PageTitle>
 
@@ -307,6 +310,57 @@ else
                             </div>
                         }
                     </div>
+
+                    <div class="admin-csv-import">
+                        <div class="admin-fixture-existing__title">
+                            <div>
+                                <h3>Importar fixture CSV</h3>
+                                <span>Formato: Round,Date,Time,HomeTeam,AwayTeam</span>
+                            </div>
+                        </div>
+
+                        <textarea class="form-control admin-csv-import__input" value="@fixtureCsvInput" @oninput="e => fixtureCsvInput = e.Value?.ToString() ?? string.Empty" placeholder="Round,Date,Time,HomeTeam,AwayTeam&#10;1,2026-08-02,14:00,Olimpia,Rivadavia"></textarea>
+                        <div class="admin-csv-import__actions">
+                            <button type="button" class="leagues-button leagues-button--muted" disabled="@isSaving" @onclick="PreviewFixtureCsvAsync">Previsualizar</button>
+                            @if (fixtureCsvPreview is not null && fixtureCsvPreview.ValidCount > 0)
+                            {
+                                <button type="button" class="leagues-button" disabled="@isSaving" @onclick="ConfirmFixtureCsvImportAsync">Confirmar importacion (@fixtureCsvPreview.ValidCount)</button>
+                            }
+                        </div>
+
+                        @if (fixtureCsvPreview is not null)
+                        {
+                            <div class="table-panel admin-csv-preview">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Fila</th>
+                                            <th>Jornada</th>
+                                            <th>Fecha/hora</th>
+                                            <th>Local</th>
+                                            <th>Visitante</th>
+                                            <th>Estado</th>
+                                            <th>Mensaje</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var row in fixtureCsvPreview.Rows)
+                                        {
+                                            <tr class="admin-csv-preview--@row.Status.ToString().ToLowerInvariant()">
+                                                <td>@row.RowNumber</td>
+                                                <td>@row.Round</td>
+                                                <td>@row.StartsAt</td>
+                                                <td>@row.HomeTeam</td>
+                                                <td>@row.AwayTeam</td>
+                                                <td>@row.Status</td>
+                                                <td>@row.Message</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
                 </section>
             </div>
         </section>
@@ -449,6 +503,8 @@ else
     private Guid? newMatchAwayTeamId;
     private string newMatchRoundName = string.Empty;
     private string newMatchStartsAt = string.Empty;
+    private string fixtureCsvInput = string.Empty;
+    private FixtureCsvPreviewResult? fixtureCsvPreview;
 
     private List<Season> DisplaySeasons => league?.Seasons
         .Where(x => canManage || x.IsActive)
@@ -779,6 +835,7 @@ else
     {
         newMatchHomeTeamId = null;
         newMatchAwayTeamId = null;
+        fixtureCsvPreview = null;
         await LoadMatchTeamOptionsAsync();
     }
 
@@ -889,6 +946,77 @@ else
         newMatchStartsAt = string.Empty;
         SetMessage("Partido creado correctamente.", true);
         await LoadAsync();
+    }
+
+    private async Task PreviewFixtureCsvAsync()
+    {
+        if (newMatchCompetitionId is null)
+        {
+            SetMessage("Selecciona una competencia antes de previsualizar el CSV.", false);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(fixtureCsvInput))
+        {
+            SetMessage("Pega el contenido CSV para previsualizar.", false);
+            return;
+        }
+
+        fixtureCsvPreview = await FixtureCsvImportService.PreviewAsync(newMatchCompetitionId.Value, fixtureCsvInput);
+        SetMessage($"Preview generado: {fixtureCsvPreview.ValidCount} fila(s) valida(s) de {fixtureCsvPreview.Rows.Count}.", fixtureCsvPreview.ValidCount > 0);
+    }
+
+    private async Task ConfirmFixtureCsvImportAsync()
+    {
+        if (newMatchCompetitionId is null || fixtureCsvPreview is null)
+        {
+            SetMessage("Genera una previsualizacion antes de importar.", false);
+            return;
+        }
+
+        var validRows = fixtureCsvPreview.Rows
+            .Where(x => x.Status == FixtureCsvRowStatus.Valid)
+            .Select(x => x.RowNumber)
+            .ToList();
+        if (validRows.Count == 0)
+        {
+            SetMessage("No hay filas validas para importar.", false);
+            return;
+        }
+
+        var failedRows = fixtureCsvPreview.Rows.Count - validRows.Count;
+        isSaving = true;
+        try
+        {
+            var result = await FixtureCsvImportService.ImportAsync(newMatchCompetitionId.Value, validRows, fixtureCsvInput);
+            fixtureCsvPreview = null;
+            await SafeReloadAsync();
+            var failedMessage = failedRows > 0 ? $" {failedRows} fila(s) fallaron y no se guardaron." : string.Empty;
+            SetMessage($"Se importaron {result.ImportedCount} partido(s).{failedMessage} Genera una nueva previsualizacion para volver a importar.", true);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Fixture CSV import failed after confirmation for competition {CompetitionId}.", newMatchCompetitionId);
+            fixtureCsvPreview = null;
+            await SafeReloadAsync();
+            SetMessage("No se pudo completar la importacion. Si algunos partidos se guardaron, genera una nueva previsualizacion antes de intentar otra vez.", false);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task SafeReloadAsync()
+    {
+        try
+        {
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to reload league admin data after fixture CSV import.");
+        }
     }
 
     private SeasonEditModel GetSeasonEdit(Guid seasonId) => seasonEdits.TryGetValue(seasonId, out var edit) ? edit : new SeasonEditModel();
