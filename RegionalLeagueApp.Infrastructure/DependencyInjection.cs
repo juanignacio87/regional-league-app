@@ -7,11 +7,13 @@ using RegionalLeagueApp.Application.Collaboration;
 using RegionalLeagueApp.Application.Fixtures;
 using RegionalLeagueApp.Infrastructure.Collaboration;
 using RegionalLeagueApp.Application.Matches;
+using RegionalLeagueApp.Application.Players;
 using RegionalLeagueApp.Application.Standings;
 using RegionalLeagueApp.Infrastructure.Fixtures;
 using RegionalLeagueApp.Infrastructure.Identity;
 using RegionalLeagueApp.Infrastructure.Matches;
 using RegionalLeagueApp.Infrastructure.Persistence;
+using RegionalLeagueApp.Infrastructure.Players;
 using RegionalLeagueApp.Infrastructure.Seed;
 using RegionalLeagueApp.Infrastructure.Standings;
 
@@ -49,6 +51,7 @@ public static class DependencyInjection
         services.AddScoped<IMatchAdministrationPermissionService, EfMatchAdministrationPermissionService>();
         services.AddScoped<IMatchScoreRecalculationService, EfMatchScoreRecalculationService>();
         services.AddScoped<IFixtureCsvImportService, EfFixtureCsvImportService>();
+        services.AddScoped<IPlayerCsvImportService, EfPlayerCsvImportService>();
         services.AddScoped<IStandingsQueryService, EfStandingsQueryService>();
         services.AddScoped<IStandingsRecalculationService, EfStandingsRecalculationService>();
         services.Configure<DevelopmentSeedOptions>(options =>

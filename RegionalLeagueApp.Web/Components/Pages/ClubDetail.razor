@@ -1,8 +1,10 @@
 @page "/clubs/{Id:guid}"
 @rendermode InteractiveServer
 @using Microsoft.EntityFrameworkCore
+@using RegionalLeagueApp.Application.Players
 @inject ApplicationDbContext Db
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IPlayerCsvImportService PlayerCsvImportService
 
 <PageTitle>Club</PageTitle>
 
@@ -41,6 +43,57 @@ else
                 </span>
                 <span class="clubs-admin-shell__hint">@AllTeams.Count equipo(s)</span>
             </summary>
+
+            <section class="roster-admin-team">
+                <div class="roster-admin-team__header">
+                    <div>
+                        <h2>Importar plantel CSV</h2>
+                        <span>Formato: Team,DisplayName,FirstName,LastName,ShirtNumber,Position,BirthDate</span>
+                    </div>
+                </div>
+
+                <textarea class="form-control admin-csv-import__input" value="@playerCsvInput" @oninput="e => playerCsvInput = e.Value?.ToString() ?? string.Empty" placeholder="Team,DisplayName,FirstName,LastName,ShirtNumber,Position,BirthDate&#10;Olimpia Primera,Juan Perez,Juan,Perez,9,Forward,1998-04-10"></textarea>
+                <div class="admin-csv-import__actions">
+                    <button type="button" class="leagues-button leagues-button--muted" disabled="@isSaving" @onclick="PreviewPlayerCsvAsync">Previsualizar</button>
+                    @if (playerCsvPreview is not null && playerCsvPreview.ValidCount > 0)
+                    {
+                        <button type="button" class="leagues-button" disabled="@isSaving" @onclick="ConfirmPlayerCsvImportAsync">Confirmar importacion (@playerCsvPreview.ValidCount)</button>
+                    }
+                </div>
+
+                @if (playerCsvPreview is not null)
+                {
+                    <div class="table-panel admin-csv-preview">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Fila</th>
+                                    <th>Team</th>
+                                    <th>Display name</th>
+                                    <th>Dorsal</th>
+                                    <th>Posicion</th>
+                                    <th>Estado</th>
+                                    <th>Mensaje</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in playerCsvPreview.Rows)
+                                {
+                                    <tr class="admin-csv-preview--@row.Status.ToString().ToLowerInvariant()">
+                                        <td>@row.RowNumber</td>
+                                        <td>@row.Team</td>
+                                        <td>@row.DisplayName</td>
+                                        <td>@row.ShirtNumber</td>
+                                        <td>@row.Position</td>
+                                        <td>@row.Status</td>
+                                        <td>@row.Message</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </section>
 
             @foreach (var team in AllTeams)
             {
@@ -152,6 +205,8 @@ else
     private bool isSaving;
     private bool isSuccessMessage;
     private string? statusMessage;
+    private string playerCsvInput = string.Empty;
+    private PlayerCsvPreviewResult? playerCsvPreview;
 
     private List<Team> AllTeams => club is null
         ? []
@@ -330,6 +385,58 @@ else
         await Db.SaveChangesAsync();
         SetMessage(isActive ? "Jugador reactivado." : "Jugador archivado.", true);
         await LoadAsync();
+    }
+
+    private async Task PreviewPlayerCsvAsync()
+    {
+        if (string.IsNullOrWhiteSpace(playerCsvInput))
+        {
+            SetMessage("Pega el contenido CSV para previsualizar.", false);
+            return;
+        }
+
+        playerCsvPreview = await PlayerCsvImportService.PreviewAsync(Id, playerCsvInput);
+        SetMessage($"Preview generado: {playerCsvPreview.ValidCount} fila(s) valida(s) de {playerCsvPreview.Rows.Count}.", playerCsvPreview.ValidCount > 0);
+    }
+
+    private async Task ConfirmPlayerCsvImportAsync()
+    {
+        if (playerCsvPreview is null)
+        {
+            SetMessage("Genera una previsualizacion antes de importar.", false);
+            return;
+        }
+
+        var validRows = playerCsvPreview.Rows
+            .Where(x => x.Status == PlayerCsvRowStatus.Valid)
+            .Select(x => x.RowNumber)
+            .ToList();
+        if (validRows.Count == 0)
+        {
+            SetMessage("No hay filas validas para importar.", false);
+            return;
+        }
+
+        var failedRows = playerCsvPreview.Rows.Count - validRows.Count;
+        isSaving = true;
+        try
+        {
+            var result = await PlayerCsvImportService.ImportAsync(Id, validRows, playerCsvInput);
+            playerCsvPreview = null;
+            await LoadAsync();
+            var failedMessage = failedRows > 0 ? $" {failedRows} fila(s) fallaron y no se guardaron." : string.Empty;
+            SetMessage($"Se importaron {result.ImportedCount} jugador(es).{failedMessage} Genera una nueva previsualizacion para volver a importar.", true);
+        }
+        catch (DbUpdateException)
+        {
+            playerCsvPreview = null;
+            await LoadAsync();
+            SetMessage("No se pudo completar la importacion. No se guardaron jugadores parciales.", false);
+        }
+        finally
+        {
+            isSaving = false;
+        }
     }
 
     private async Task<string?> ValidatePlayerAsync(Guid teamId, PlayerEditModel model, Guid? currentPlayerId)
