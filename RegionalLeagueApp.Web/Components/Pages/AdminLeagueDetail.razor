@@ -332,6 +332,7 @@ else
                                                             <small>@match.Status</small>
                                                         </a>
                                                         <div class="admin-fixture-actions">
+                                                            <a class="admin-link-button" href="/admin/matches/@match.Id">Gestionar</a>
                                                             <button type="button" class="admin-link-button" disabled="@isSaving" @onclick="() => BeginMatchEdit(match)">Editar</button>
                                                             <button type="button" class="admin-link-button admin-link-button-muted" disabled="@isSaving" @onclick="() => CancelExistingMatchAsync(match.Id)">Marcar cancelado</button>
                                                         </div>

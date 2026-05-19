@@ -1,10 +1,13 @@
 @page "/clubs/{Id:guid}"
 @rendermode InteractiveServer
+@using System.IO
+@using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.EntityFrameworkCore
 @using RegionalLeagueApp.Application.Players
 @inject ApplicationDbContext Db
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IPlayerCsvImportService PlayerCsvImportService
+@inject IWebHostEnvironment Environment
 
 <PageTitle>Club</PageTitle>
 
@@ -35,6 +38,25 @@ else
 
     @if (canManage)
     {
+        <section class="panel club-admin-panel">
+            <div class="club-admin-panel__header">
+                <div>
+                    <p class="eyebrow">Admin / Moderator</p>
+                    <h2>Escudo del club</h2>
+                    <span>PNG, JPG, WebP o GIF. Maximo 1 MB.</span>
+                </div>
+                <ClubLogo Name="@club.Name" LogoPath="@club.LogoPath" Class="club-logo-admin__preview" />
+            </div>
+
+            <div class="club-logo-admin__form">
+                <InputFile id="club-logo-file" OnChange="OnClubLogoSelected" accept="image/png,image/jpeg,image/webp,image/gif" />
+                <span>@(selectedLogoFileName ?? "Selecciona una imagen para actualizar el escudo.")</span>
+                <button type="button" class="leagues-button" disabled="@(isSavingLogo || selectedLogoFile is null)" @onclick="SaveClubLogoAsync">
+                    @(isSavingLogo ? "Guardando..." : "Actualizar escudo")
+                </button>
+            </div>
+        </section>
+
         <details class="panel roster-admin-shell">
             <summary>
                 <span>
@@ -203,10 +225,23 @@ else
     private Club? club;
     private bool canManage;
     private bool isSaving;
+    private bool isSavingLogo;
     private bool isSuccessMessage;
     private string? statusMessage;
     private string playerCsvInput = string.Empty;
+    private IBrowserFile? selectedLogoFile;
+    private string? selectedLogoFileName;
     private PlayerCsvPreviewResult? playerCsvPreview;
+    private static readonly HashSet<string> AllowedLogoExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".webp",
+        ".gif"
+    };
+
+    private const long MaxLogoBytes = 1 * 1024 * 1024;
 
     private List<Team> AllTeams => club is null
         ? []
@@ -253,6 +288,74 @@ else
         foreach (var team in club?.Teams ?? [])
         {
             createModels.TryAdd(team.Id, new PlayerEditModel { IsActive = true });
+        }
+    }
+
+    private void OnClubLogoSelected(InputFileChangeEventArgs args)
+    {
+        selectedLogoFile = args.File;
+        selectedLogoFileName = selectedLogoFile.Name;
+    }
+
+    private async Task SaveClubLogoAsync()
+    {
+        if (!canManage)
+        {
+            SetMessage("No tenes permisos para cargar logos.", false);
+            return;
+        }
+
+        if (selectedLogoFile is null)
+        {
+            SetMessage("Selecciona una imagen para actualizar el escudo.", false);
+            return;
+        }
+
+        var file = selectedLogoFile;
+        var extension = Path.GetExtension(file.Name);
+        if (!file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase) || !AllowedLogoExtensions.Contains(extension))
+        {
+            SetMessage("El archivo debe ser una imagen valida.", false);
+            return;
+        }
+
+        if (file.Size > MaxLogoBytes)
+        {
+            SetMessage("La imagen no puede superar 1 MB.", false);
+            return;
+        }
+
+        isSavingLogo = true;
+        try
+        {
+            var selectedClub = await Db.Clubs.FirstOrDefaultAsync(x => x.Id == Id);
+            if (selectedClub is null)
+            {
+                SetMessage("No se encontro el club seleccionado.", false);
+                return;
+            }
+
+            var uploadsPath = Path.Combine(Environment.WebRootPath, "uploads", "clubs");
+            Directory.CreateDirectory(uploadsPath);
+
+            var fileName = $"{selectedClub.Id:N}-{Guid.NewGuid():N}{extension.ToLowerInvariant()}";
+            var physicalPath = Path.Combine(uploadsPath, fileName);
+
+            await using (var stream = File.Create(physicalPath))
+            {
+                await file.OpenReadStream(MaxLogoBytes).CopyToAsync(stream);
+            }
+
+            selectedClub.SetLogoPath($"/uploads/clubs/{fileName}");
+            await Db.SaveChangesAsync();
+            selectedLogoFile = null;
+            selectedLogoFileName = null;
+            SetMessage("Escudo actualizado correctamente.", true);
+            await LoadAsync();
+        }
+        finally
+        {
+            isSavingLogo = false;
         }
     }
 

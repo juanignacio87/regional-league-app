@@ -27,7 +27,7 @@ else
 
             @if (CanEditMatch)
             {
-                <a class="match-center-edit" href="@EditMatchUrl">Editar partido</a>
+                <a class="match-center-edit" href="@EditMatchUrl">Administrar partido</a>
             }
         </div>
 
@@ -193,7 +193,7 @@ else
 
     private bool CanEditMatch => match is not null && access.CanManageMatch(match.HomeTeamId, match.AwayTeamId);
 
-    private string EditMatchUrl => $"/admin?matchId={Id}";
+    private string EditMatchUrl => $"/admin/matches/{Id}";
 
     private string MatchBackHref => match?.Status == MatchStatus.Finished ? "/results" : "/fixture";
 

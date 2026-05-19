@@ -1,9 +1,9 @@
 @page "/admin"
+@page "/admin/matches/{RouteMatchId:guid}"
 @rendermode InteractiveServer
 @attribute [Authorize(Policy = "RequireContributor")]
 @using System.ComponentModel.DataAnnotations
 @using System.Text.Json
-@using System.IO
 @using Microsoft.AspNetCore.SignalR
 @using Microsoft.EntityFrameworkCore
 @using RegionalLeagueApp.Application.Collaboration
@@ -15,43 +15,55 @@
 @inject IMatchScoreRecalculationService MatchScoreRecalculationService
 @inject IHubContext<MatchUpdatesHub> MatchUpdates
 @inject ILogger<Admin> Logger
-@inject IWebHostEnvironment Environment
+@inject NavigationManager Navigation
 
-<PageTitle>Admin</PageTitle>
+<PageTitle>@(IsMatchAdminRoute ? "Administrar partido" : "Admin")</PageTitle>
+
+@if (IsMatchAdminRoute)
+{
+    <PageBreadcrumb
+        BackHref="@(editing is null ? "/admin" : $"/admin/leagues/{editing.LeagueId}")"
+        ParentHref="/admin"
+        ParentLabel="Admin"
+        CurrentLabel="@AdminMatchBreadcrumbLabel" />
+}
 
 <div class="page-heading admin-heading">
     <div>
         <p class="eyebrow">Administracion</p>
-        <h1>Gestion de partidos</h1>
+        <h1>@(IsMatchAdminRoute ? "Gestion de partido" : "Panel general")</h1>
     </div>
     <span class="admin-badge">@access.RoleLabel</span>
 </div>
 
-<section class="panel admin-permissions">
-    <div>
-        <p class="eyebrow">Permisos actuales</p>
-        <h2>@PermissionSummary</h2>
-    </div>
-    @if (access.IsContributor && !access.CanManageAllMatches)
-    {
-        <span>@access.AssignedTeamIds.Count equipo(s) asignado(s)</span>
-    }
-    else if (access.CanModerate)
-    {
-        <span>Puede moderar todos los partidos y eventos</span>
-    }
-</section>
-
-@if (access.CanModerate)
+@if (!IsMatchAdminRoute)
 {
-    <section class="panel admin-league-entry">
+    <section class="panel admin-permissions">
         <div>
-            <p class="eyebrow">Estructura deportiva</p>
-            <h2>Ligas, temporadas y competencias</h2>
-            <span>Usa el contexto administrativo de cada liga para crear temporadas, competencias, equipos y partidos.</span>
+            <p class="eyebrow">Permisos actuales</p>
+            <h2>@PermissionSummary</h2>
         </div>
-        <a class="leagues-button leagues-button--muted" href="/leagues">Gestionar ligas</a>
+        @if (access.IsContributor && !access.CanManageAllMatches)
+        {
+            <span>@access.AssignedTeamIds.Count equipo(s) asignado(s)</span>
+        }
+        else if (access.CanModerate)
+        {
+            <span>Puede moderar todos los partidos y eventos</span>
+        }
     </section>
+
+    @if (access.CanModerate)
+    {
+        <section class="panel admin-league-entry">
+            <div>
+                <p class="eyebrow">Estructura deportiva</p>
+                <h2>Ligas, temporadas y competencias</h2>
+                <span>Usa el contexto administrativo de cada liga para crear temporadas, competencias, equipos y partidos.</span>
+            </div>
+            <a class="leagues-button leagues-button--muted" href="/leagues">Gestionar ligas</a>
+        </section>
+    }
 }
 
 @if (!string.IsNullOrWhiteSpace(successMessage))
@@ -64,35 +76,8 @@
     <div class="alert alert-danger admin-feedback" role="alert">@errorMessage</div>
 }
 
-@if (access.CanModerate)
+@if (!IsMatchAdminRoute && access.CanModerate)
 {
-    <section class="panel admin-logo-panel">
-        <div class="panel-title-row">
-            <div>
-                <p class="eyebrow">Clubes</p>
-                <h2>Logo del club</h2>
-            </div>
-            <span>@clubLogoOptions.Count club(es)</span>
-        </div>
-
-        <div class="admin-logo-form">
-            <div>
-                <label for="club-logo-select">Club</label>
-                <select id="club-logo-select" class="form-control" @bind="selectedLogoClubId">
-                    @foreach (var club in clubLogoOptions)
-                    {
-                        <option value="@club.Id">@club.Name</option>
-                    }
-                </select>
-            </div>
-            <div>
-                <label for="club-logo-file">Imagen</label>
-                <InputFile id="club-logo-file" OnChange="UploadClubLogoAsync" accept="image/png,image/jpeg,image/webp,image/gif" />
-                <small>PNG, JPG, WebP o GIF. Maximo 1 MB.</small>
-            </div>
-        </div>
-    </section>
-
     <section class="panel admin-proposals">
         <div class="panel-title-row">
             <div>
@@ -128,149 +113,99 @@
     </section>
 }
 
-@if (matches.Count == 0)
+@if (IsMatchAdminRoute)
 {
-    <EmptyState Text="No hay partidos para administrar." />
-}
-else
-{
-    <section class="admin-grid">
-        <article class="panel table-panel admin-match-list">
-            <div class="panel-title-row">
-                <div>
-                    <p class="eyebrow">Partidos</p>
-                    <h2>Fixture cargado</h2>
+    @if (editing is null)
+    {
+        <EmptyState Text="No se pudo cargar el partido solicitado o no tenes permisos para gestionarlo." />
+    }
+    else
+    {
+        <section class="admin-match-shell">
+            <article class="panel admin-match-header-card">
+                <div class="admin-match-context">
+                    <span>@editing.LeagueName</span>
+                    <span>@editing.SeasonName</span>
+                    <span>@editing.CompetitionName</span>
+                    <span>@editing.RoundName</span>
                 </div>
-                <span>@FilteredMatches.Count de @matches.Count partidos</span>
-            </div>
-
-            <div class="admin-filters">
-                <div>
-                    <label for="status-filter">Estado</label>
-                    <select id="status-filter" class="form-control" @bind="statusFilter">
-                        <option value="">Todos</option>
-                        @foreach (var status in Enum.GetValues<MatchStatus>())
-                        {
-                            <option value="@status.ToString()">@status</option>
-                        }
-                    </select>
-                </div>
-                <div>
-                    <label for="round-filter">Fecha</label>
-                    <select id="round-filter" class="form-control" @bind="roundFilter">
-                        <option value="">Todas</option>
-                        @foreach (var roundName in RoundOptions)
-                        {
-                            <option value="@roundName">@roundName</option>
-                        }
-                    </select>
-                </div>
-                <div>
-                    <label for="club-filter">Club / equipo</label>
-                    <select id="club-filter" class="form-control" @bind="clubFilter">
-                        <option value="">Todos</option>
-                        @foreach (var clubName in ClubOptions)
-                        {
-                            <option value="@clubName">@clubName</option>
-                        }
-                    </select>
-                </div>
-                <button type="button" class="admin-link-button admin-clear-button" @onclick="ClearFilters">Limpiar</button>
-            </div>
-
-            @if (FilteredMatches.Count == 0)
-            {
-                <EmptyState Text="No hay partidos que coincidan con los filtros." />
-            }
-            else
-            {
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Fecha</th>
-                            <th>Partido</th>
-                            <th>Estado</th>
-                            <th>Resultado</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var match in FilteredMatches)
-                        {
-                            <tr class="@(editing?.MatchId == match.Id ? "is-selected" : string.Empty)">
-                                <td>
-                                    <span class="table-kicker">@match.RoundName</span>
-                                    @match.StartsAt.LocalDateTime.ToString("dd/MM HH:mm")
-                                </td>
-                                <td>
-                                    <strong>@match.HomeTeamName</strong>
-                                    <span class="muted-text">vs</span>
-                                    <strong>@match.AwayTeamName</strong>
-                                </td>
-                                <td><span class="status-pill @StatusClass(match.Status)">@match.Status</span></td>
-                                <td><strong>@ScoreText(match.HomeScore, match.AwayScore)</strong></td>
-                                <td class="table-actions">
-                                    <button type="button" class="admin-link-button" @onclick="async () => await SelectMatchAsync(match.Id)">Editar</button>
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            }
-        </article>
-
-        <aside class="panel admin-editor">
-            @if (editing is null)
-            {
-                <EmptyState Text="Selecciona un partido para editar su estado y resultado." />
-            }
-            else
-            {
-                <div class="panel-title-row">
+                <div class="admin-match-scoreboard">
                     <div>
-                        <p class="eyebrow">Edicion</p>
-                        <h2>@editing.HomeTeamName vs @editing.AwayTeamName</h2>
+                        <strong>@editing.HomeTeamName</strong>
+                        <small>Local</small>
                     </div>
-                    <a href="matches/@editing.MatchId">Ver</a>
+                    <div class="admin-match-score">
+                        <span class="status-pill @StatusClass(editing.Status)">@editing.Status</span>
+                        <strong>@ScoreText(editing.HomeScore, editing.AwayScore)</strong>
+                        <small>@editing.StartsAt.LocalDateTime.ToString("dd/MM/yyyy HH:mm")</small>
+                    </div>
+                    <div>
+                        <strong>@editing.AwayTeamName</strong>
+                        <small>Visitante</small>
+                    </div>
                 </div>
+                <div class="admin-match-links">
+                    <a class="admin-link-button admin-link-button-muted" href="/admin">Volver al admin</a>
+                    <a class="admin-link-button" href="/matches/@editing.MatchId">Vista publica</a>
+                </div>
+            </article>
 
-                <dl class="detail-list compact">
-                    <div><dt>Competencia</dt><dd>@editing.CompetitionName</dd></div>
-                    <div><dt>Fecha</dt><dd>@editing.StartsAt.LocalDateTime.ToString("dd/MM/yyyy HH:mm")</dd></div>
-                    <div><dt>Local</dt><dd>@editing.HomeTeamName</dd></div>
-                    <div><dt>Visitante</dt><dd>@editing.AwayTeamName</dd></div>
-                </dl>
-
-                <EditForm Model="editing" OnValidSubmit="SaveAsync" class="admin-form" aria-busy="@isSaving">
-                    <DataAnnotationsValidator />
-                    <ValidationSummary />
-
-                    <label for="status">Estado</label>
-                    <InputSelect id="status" class="form-control" @bind-Value="editing.Status">
-                        @foreach (var status in Enum.GetValues<MatchStatus>())
-                        {
-                            <option value="@status">@status</option>
-                        }
-                    </InputSelect>
-
-                    <div class="score-edit-grid">
+            <section class="admin-match-layout">
+                <article class="panel admin-match-editor">
+                    <div class="panel-title-row">
                         <div>
-                            <label for="home-score">Goles local</label>
-                            <InputNumber id="home-score" class="form-control" min="0" @bind-Value="editing.HomeScore" disabled />
-                        </div>
-                        <div>
-                            <label for="away-score">Goles visitante</label>
-                            <InputNumber id="away-score" class="form-control" min="0" @bind-Value="editing.AwayScore" disabled />
+                            <p class="eyebrow">Partido</p>
+                            <h2>Datos operativos</h2>
                         </div>
                     </div>
-                    <p class="admin-help-text">El marcador se calcula automaticamente desde los goles.</p>
 
-                    <button class="btn btn-primary" type="submit" disabled="@isSaving">
-                        @(isSaving ? "Guardando..." : access.CanModerate ? "Guardar cambios" : "Enviar propuesta")
-                    </button>
-                </EditForm>
+                    <EditForm Model="editing" OnValidSubmit="SaveAsync" class="admin-form" aria-busy="@isSaving">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
 
-                <div class="admin-events">
+                        <div class="admin-match-edit-grid">
+                            <label>
+                                Estado
+                                <InputSelect class="form-control" @bind-Value="editing.Status">
+                                    @foreach (var status in Enum.GetValues<MatchStatus>())
+                                    {
+                                        <option value="@status">@status</option>
+                                    }
+                                </InputSelect>
+                            </label>
+                            <label>
+                                Fecha/hora
+                                <input class="form-control" type="datetime-local" value="@editing.StartsAtInput" @oninput="e => editing.StartsAtInput = e.Value?.ToString() ?? string.Empty" disabled="@(!access.CanModerate)" />
+                            </label>
+                            <label>
+                                Local
+                                <InputSelect class="form-control" @bind-Value="editing.HomeTeamId" disabled="@(!access.CanModerate)">
+                                    @foreach (var team in matchTeamOptions)
+                                    {
+                                        <option value="@team.Id">@team.Label</option>
+                                    }
+                                </InputSelect>
+                            </label>
+                            <label>
+                                Visitante
+                                <InputSelect class="form-control" @bind-Value="editing.AwayTeamId" disabled="@(!access.CanModerate)">
+                                    @foreach (var team in matchTeamOptions)
+                                    {
+                                        <option value="@team.Id">@team.Label</option>
+                                    }
+                                </InputSelect>
+                            </label>
+                        </div>
+
+                        <p class="admin-help-text">El marcador se calcula automaticamente desde los goles.</p>
+
+                        <button class="btn btn-primary" type="submit" disabled="@isSaving">
+                            @(isSaving ? "Guardando..." : access.CanModerate ? "Guardar cambios" : "Enviar propuesta")
+                        </button>
+                    </EditForm>
+                </article>
+
+                <article class="panel admin-events">
                     <div class="panel-title-row">
                         <div>
                             <p class="eyebrow">Eventos</p>
@@ -286,14 +221,86 @@ else
                     else
                     {
                         <div class="admin-event-list">
-                            @foreach (var item in selectedEvents)
+                            @foreach (var group in SelectedEventGroups)
                             {
-                                <div class="admin-event-row">
-                                    <strong>@item.Minute'</strong>
-                                    <span>@EventLabel(item.EventType)</span>
-                                    <small>@item.TeamName - @item.PlayerName</small>
-                                    <button type="button" class="admin-link-button" @onclick="async () => await DeleteEventAsync(item.Id)">@(access.CanModerate ? "Eliminar" : "Proponer eliminar")</button>
-                                </div>
+                                <section class="admin-event-period">
+                                    <h3>@group.Key</h3>
+                                    <div class="admin-event-table-head" aria-hidden="true">
+                                        <span>Min</span>
+                                        <span>Evento</span>
+                                        <span>Equipo</span>
+                                        <span>Jugador</span>
+                                        <span>Nota</span>
+                                        <span>Acciones</span>
+                                    </div>
+                                    @foreach (var item in group)
+                                    {
+                                        var edit = GetEventEdit(item);
+                                        <article class="admin-event-row @(editingEventId == item.Id ? "admin-event-row--editing" : string.Empty)">
+                                            <div class="admin-event-main">
+                                                <strong>@item.Minute'</strong>
+                                                <span>@EventLabel(item.EventType)</span>
+                                                <small>@item.TeamName</small>
+                                                <small>@item.PlayerName</small>
+                                                <span class="admin-event-note">@(!string.IsNullOrWhiteSpace(item.Notes) ? item.Notes : "-")</span>
+                                                <div class="admin-event-actions">
+                                                    @if (access.CanModerate)
+                                                    {
+                                                        <button type="button" class="admin-link-button" @onclick="() => BeginEventEdit(item)">Editar</button>
+                                                    }
+                                                    <button type="button" class="admin-link-button admin-link-button-muted" @onclick="async () => await DeleteEventAsync(item.Id)">@(access.CanModerate ? "Quitar evento" : "Proponer quitar")</button>
+                                                </div>
+                                            </div>
+
+                                            @if (editingEventId == item.Id && access.CanModerate)
+                                            {
+                                                <div class="admin-event-editor">
+                                                    <div class="admin-event-editor-grid">
+                                                        <label>Minuto <InputNumber class="form-control" min="0" max="130" @bind-Value="edit.Minute" /></label>
+                                                        <label>
+                                                            Evento
+                                                            <InputSelect class="form-control" @bind-Value="edit.EventType">
+                                                                @foreach (var eventType in AllowedEventTypes)
+                                                                {
+                                                                    <option value="@eventType">@EventLabel(eventType)</option>
+                                                                }
+                                                            </InputSelect>
+                                                        </label>
+                                                        <label>
+                                                            Equipo
+                                                            <InputSelect class="form-control" @bind-Value="edit.TeamId" @bind-Value:after="() => OnEventEditTeamChanged(edit)">
+                                                                <option value="@editing.HomeTeamId">@editing.HomeTeamName</option>
+                                                                <option value="@editing.AwayTeamId">@editing.AwayTeamName</option>
+                                                            </InputSelect>
+                                                        </label>
+                                                        <label>
+                                                            Jugador
+                                                            @if (EventPlayersForTeam(edit.TeamId).Count == 0)
+                                                            {
+                                                                <InputText class="form-control" @bind-Value="edit.PlayerName" placeholder="Nombre del jugador" />
+                                                            }
+                                                            else
+                                                            {
+                                                                <select class="form-control" value="@edit.PlayerId" @onchange="e => OnEventEditPlayerChanged(edit, e)">
+                                                                    <option value="">Seleccionar jugador</option>
+                                                                    @foreach (var player in EventPlayersForTeam(edit.TeamId))
+                                                                    {
+                                                                        <option value="@player.Id">@player.Label</option>
+                                                                    }
+                                                                </select>
+                                                            }
+                                                        </label>
+                                                        <label>Nota <InputText class="form-control" @bind-Value="edit.Notes" /></label>
+                                                    </div>
+                                                    <div class="admin-event-actions admin-event-editor-actions">
+                                                        <button type="button" class="admin-link-button" disabled="@isSavingEvent" @onclick="() => SaveEventEditAsync(item.Id)">Guardar</button>
+                                                        <button type="button" class="admin-link-button admin-link-button-muted" disabled="@isSavingEvent" @onclick="CancelEventEdit">Cancelar</button>
+                                                    </div>
+                                                </div>
+                                            }
+                                        </article>
+                                    }
+                                </section>
                             }
                         </div>
                     }
@@ -301,37 +308,33 @@ else
                     <EditForm Model="eventForm" OnValidSubmit="CreateEventAsync" class="admin-form admin-event-form">
                         <DataAnnotationsValidator />
 
-                        <div class="score-edit-grid">
-                            <div>
-                                <label for="event-type">Evento</label>
-                                <InputSelect id="event-type" class="form-control" @bind-Value="eventForm.EventType">
+                        <div class="admin-event-editor-grid">
+                            <label>
+                                Evento
+                                <InputSelect class="form-control" @bind-Value="eventForm.EventType">
                                     @foreach (var eventType in AllowedEventTypes)
                                     {
                                         <option value="@eventType">@EventLabel(eventType)</option>
                                     }
                                 </InputSelect>
-                            </div>
-                            <div>
-                                <label for="event-team">Equipo</label>
-                                <InputSelect id="event-team" class="form-control" @bind-Value="eventForm.TeamId" @bind-Value:after="OnEventTeamChangedAsync">
+                            </label>
+                            <label>
+                                Equipo
+                                <InputSelect class="form-control" @bind-Value="eventForm.TeamId" @bind-Value:after="OnEventTeamChangedAsync">
                                     <option value="@editing.HomeTeamId">@editing.HomeTeamName</option>
                                     <option value="@editing.AwayTeamId">@editing.AwayTeamName</option>
                                 </InputSelect>
-                            </div>
-                        </div>
-
-                        <div class="score-edit-grid">
-                            <div>
-                                <label for="event-player">Jugador</label>
+                            </label>
+                            <label>
+                                Jugador
                                 @if (eventPlayers.Count == 0)
                                 {
-                                    <p class="admin-empty-hint">No hay jugadores activos cargados para este equipo.</p>
-                                    <InputText id="event-player" class="form-control" @bind-Value="eventForm.PlayerName" placeholder="Nombre del jugador" />
+                                    <InputText class="form-control" @bind-Value="eventForm.PlayerName" placeholder="Nombre del jugador" />
                                     <ValidationMessage For="() => eventForm.PlayerName" />
                                 }
                                 else
                                 {
-                                    <InputSelect id="event-player" class="form-control" @bind-Value="eventForm.PlayerId" @bind-Value:after="OnEventPlayerChanged">
+                                    <InputSelect class="form-control" @bind-Value="eventForm.PlayerId" @bind-Value:after="OnEventPlayerChanged">
                                         <option value="">Seleccionar jugador</option>
                                         @foreach (var player in eventPlayers)
                                         {
@@ -340,25 +343,51 @@ else
                                     </InputSelect>
                                     <ValidationMessage For="() => eventForm.PlayerId" />
                                 }
-                            </div>
-                            <div>
-                                <label for="event-minute">Minuto</label>
-                                <InputNumber id="event-minute" class="form-control" min="0" max="130" @bind-Value="eventForm.Minute" />
+                            </label>
+                            <label>
+                                Minuto
+                                <InputNumber class="form-control" min="0" max="130" @bind-Value="eventForm.Minute" />
                                 <ValidationMessage For="() => eventForm.Minute" />
-                            </div>
+                            </label>
+                            <label>
+                                Nota
+                                <InputText class="form-control" @bind-Value="eventForm.Notes" />
+                            </label>
                         </div>
 
                         <button class="btn btn-primary" type="submit" disabled="@isSavingEvent">
                             @(isSavingEvent ? "Agregando..." : access.CanModerate ? "Agregar evento" : "Proponer evento")
                         </button>
                     </EditForm>
-                </div>
-            }
-        </aside>
+                </article>
+            </section>
+        </section>
+    }
+}
+else
+{
+    <section class="panel admin-league-entry">
+        <div>
+            <p class="eyebrow">Partidos</p>
+            <h2>Gestion por contexto</h2>
+            <span>Para editar un partido, entra desde la liga administrativa o desde el Match Center publico. Esta vista ya no carga el fixture global.</span>
+        </div>
+        <a class="leagues-button leagues-button--muted" href="/leagues">Ir a ligas</a>
+    </section>
+
+    <section class="panel admin-league-entry">
+        <div>
+            <p class="eyebrow">Flujo recomendado</p>
+            <h2>Liga -> competencia -> partido</h2>
+            <span>La gestion operativa de eventos, estado y fecha vive en /admin/matches/{id}.</span>
+        </div>
     </section>
 }
 
 @code {
+    [Parameter]
+    public Guid? RouteMatchId { get; set; }
+
     [SupplyParameterFromQuery(Name = "matchId")]
     public Guid? RequestedMatchId { get; set; }
 
@@ -367,13 +396,15 @@ else
     private EventCreateModel eventForm = new();
     private readonly List<AdminMatchEventRow> selectedEvents = [];
     private readonly List<EventPlayerOption> eventPlayers = [];
+    private readonly List<EventPlayerOption> allMatchEventPlayers = [];
+    private readonly Dictionary<Guid, EventEditModel> eventEdits = [];
     private readonly List<PendingProposalRow> pendingProposals = [];
-    private readonly List<ClubLogoOption> clubLogoOptions = [];
+    private readonly List<TeamOption> matchTeamOptions = [];
     private MatchAdministrationAccess access = MatchAdministrationAccess.Empty;
-    private Guid selectedLogoClubId;
     private bool isSaving;
     private bool isSavingEvent;
     private bool isReviewingProposal;
+    private Guid? editingEventId;
     private string? successMessage;
     private string? errorMessage;
     private string statusFilter = string.Empty;
@@ -386,16 +417,11 @@ else
         MatchEventType.RedCard
     ];
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private static readonly HashSet<string> AllowedLogoExtensions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ".png",
-        ".jpg",
-        ".jpeg",
-        ".webp",
-        ".gif"
-    };
+    private bool IsMatchAdminRoute => RouteMatchId is not null;
 
-    private const long MaxLogoBytes = 1 * 1024 * 1024;
+    private string AdminMatchBreadcrumbLabel => editing is null
+        ? "Partido"
+        : $"{editing.LeagueName} / {editing.CompetitionName} / {editing.HomeTeamName} vs {editing.AwayTeamName}";
 
     private string PermissionSummary => access.CanManageAllMatches
         ? "Puede editar cualquier partido y moderar eventos."
@@ -409,6 +435,10 @@ else
         .Where(match => string.IsNullOrWhiteSpace(clubFilter) || match.HomeTeamName == clubFilter || match.AwayTeamName == clubFilter)
         .ToList();
 
+    private IEnumerable<IGrouping<string, AdminMatchEventRow>> SelectedEventGroups => selectedEvents
+        .GroupBy(item => EventPeriod(item.Minute))
+        .OrderBy(group => group.Min(item => item.Minute));
+
     private List<string> RoundOptions => matches
         .Select(match => match.RoundName)
         .Distinct()
@@ -421,33 +451,49 @@ else
         .OrderBy(clubName => clubName)
         .ToList();
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
         access = await PermissionService.GetAccessAsync();
-        await LoadMatchesAsync();
+
+        if (IsMatchAdminRoute && RouteMatchId is { } routeMatchId)
+        {
+            await LoadMatchesAsync();
+            await SelectMatchAsync(routeMatchId);
+            return;
+        }
+
         await LoadPendingProposalsAsync();
-        await LoadClubLogoOptionsAsync();
 
         if (RequestedMatchId is { } matchId)
         {
-            await SelectMatchAsync(matchId);
+            Navigation.NavigateTo($"/admin/matches/{matchId}", replace: true);
         }
     }
 
     private async Task LoadMatchesAsync()
     {
         matches.Clear();
+        if (!IsMatchAdminRoute || RouteMatchId is null)
+        {
+            return;
+        }
+
         matches.AddRange(await Db.Matches
             .AsNoTracking()
-            .Include(x => x.Competition)
+            .Include(x => x.Competition)!.ThenInclude(x => x!.Season)!.ThenInclude(x => x!.League)
             .Include(x => x.Round)
             .Include(x => x.HomeTeam)!.ThenInclude(x => x!.Club)
             .Include(x => x.AwayTeam)!.ThenInclude(x => x!.Club)
-            .Where(x => access.CanManageAllMatches || access.AssignedTeamIds.Contains(x.HomeTeamId) || access.AssignedTeamIds.Contains(x.AwayTeamId))
+            .Where(x => x.Id == RouteMatchId && (access.CanManageAllMatches || access.AssignedTeamIds.Contains(x.HomeTeamId) || access.AssignedTeamIds.Contains(x.AwayTeamId)))
             .OrderByDescending(x => x.StartsAt)
             .Select(x => new AdminMatchRow(
                 x.Id,
+                x.CompetitionId,
+                x.Competition!.Season!.LeagueId,
+                x.Competition.Season.League!.Name,
+                x.Competition.Season.Name,
                 x.Competition!.Name,
+                x.RoundId,
                 x.Round!.Name,
                 x.HomeTeamId,
                 x.HomeTeam!.Club!.Name,
@@ -497,84 +543,6 @@ else
             ProposalDescription(x.ChangeType, x.PayloadJson, x.ProposedStatus))));
     }
 
-    private async Task LoadClubLogoOptionsAsync()
-    {
-        clubLogoOptions.Clear();
-
-        if (!access.CanModerate)
-        {
-            return;
-        }
-
-        clubLogoOptions.AddRange(await Db.Clubs
-            .AsNoTracking()
-            .OrderBy(x => x.Name)
-            .Select(x => new ClubLogoOption(x.Id, x.Name, x.LogoPath))
-            .ToListAsync());
-
-        if (selectedLogoClubId == Guid.Empty && clubLogoOptions.Count > 0)
-        {
-            selectedLogoClubId = clubLogoOptions[0].Id;
-        }
-    }
-
-    private async Task UploadClubLogoAsync(InputFileChangeEventArgs args)
-    {
-        successMessage = null;
-        errorMessage = null;
-
-        if (!access.CanModerate)
-        {
-            errorMessage = "No tenes permisos para cargar logos.";
-            return;
-        }
-
-        if (selectedLogoClubId == Guid.Empty)
-        {
-            errorMessage = "Selecciona un club.";
-            return;
-        }
-
-        var file = args.File;
-        var extension = Path.GetExtension(file.Name);
-        if (!file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase) || !AllowedLogoExtensions.Contains(extension))
-        {
-            errorMessage = "El archivo debe ser una imagen valida.";
-            return;
-        }
-
-        if (file.Size > MaxLogoBytes)
-        {
-            errorMessage = "La imagen no puede superar 1 MB.";
-            return;
-        }
-
-        var club = await Db.Clubs.FirstOrDefaultAsync(x => x.Id == selectedLogoClubId);
-        if (club is null)
-        {
-            errorMessage = "No se encontro el club seleccionado.";
-            return;
-        }
-
-        var uploadsPath = Path.Combine(Environment.WebRootPath, "uploads", "clubs");
-        Directory.CreateDirectory(uploadsPath);
-
-        var fileName = $"{club.Id:N}-{Guid.NewGuid():N}{extension.ToLowerInvariant()}";
-        var physicalPath = Path.Combine(uploadsPath, fileName);
-
-        await using (var stream = File.Create(physicalPath))
-        {
-            await file.OpenReadStream(MaxLogoBytes).CopyToAsync(stream);
-        }
-
-        club.SetLogoPath($"/uploads/clubs/{fileName}");
-        await Db.SaveChangesAsync();
-        await LoadClubLogoOptionsAsync();
-        await LoadMatchesAsync();
-        await NotifyMatchDataChangedAsync();
-        successMessage = "Logo actualizado correctamente.";
-    }
-
     private async Task SelectMatchAsync(Guid matchId)
     {
         successMessage = null;
@@ -592,13 +560,19 @@ else
         editing = new MatchEditModel
         {
             MatchId = match.Id,
+            CompetitionId = match.CompetitionId,
+            LeagueId = match.LeagueId,
+            LeagueName = match.LeagueName,
+            SeasonName = match.SeasonName,
             CompetitionName = match.CompetitionName,
+            RoundId = match.RoundId,
             RoundName = match.RoundName,
             HomeTeamId = match.HomeTeamId,
             HomeTeamName = match.HomeTeamName,
             AwayTeamId = match.AwayTeamId,
             AwayTeamName = match.AwayTeamName,
             StartsAt = match.StartsAt,
+            StartsAtInput = match.StartsAt.LocalDateTime.ToString("yyyy-MM-ddTHH:mm"),
             Status = match.Status,
             HomeScore = match.HomeScore,
             AwayScore = match.AwayScore
@@ -610,8 +584,22 @@ else
             EventType = MatchEventType.Goal
         };
 
+        await LoadMatchTeamOptionsAsync(match.CompetitionId);
         await LoadSelectedEventsAsync(match.Id);
+        await LoadAllMatchEventPlayersAsync(match.HomeTeamId, match.AwayTeamId);
         await LoadEventPlayersAsync(eventForm.TeamId);
+    }
+
+    private async Task LoadMatchTeamOptionsAsync(Guid competitionId)
+    {
+        matchTeamOptions.Clear();
+        matchTeamOptions.AddRange(await Db.Teams
+            .AsNoTracking()
+            .Where(x => x.CompetitionId == competitionId && x.IsActive && x.Club!.IsActive)
+            .OrderBy(x => x.Club!.Name)
+            .ThenBy(x => x.Name)
+            .Select(x => new TeamOption(x.Id, $"{x.Club!.Name} - {x.Name}"))
+            .ToListAsync());
     }
 
     private void ClearFilters()
@@ -634,6 +622,64 @@ else
         eventForm.PlayerName = selectedPlayer?.DisplayName ?? string.Empty;
     }
 
+    private List<EventPlayerOption> EventPlayersForTeam(Guid teamId) => allMatchEventPlayers
+        .Where(x => x.TeamId == teamId)
+        .OrderBy(x => x.ShirtNumber ?? int.MaxValue)
+        .ThenBy(x => x.DisplayName)
+        .ToList();
+
+    private EventEditModel GetEventEdit(AdminMatchEventRow item)
+    {
+        if (!eventEdits.TryGetValue(item.Id, out var edit))
+        {
+            edit = new EventEditModel
+            {
+                EventType = item.EventType,
+                Minute = item.Minute,
+                TeamId = item.TeamId ?? editing?.HomeTeamId ?? Guid.Empty,
+                PlayerId = item.PlayerId,
+                PlayerName = item.PlayerName,
+                Notes = item.Notes ?? string.Empty
+            };
+            eventEdits[item.Id] = edit;
+        }
+
+        return edit;
+    }
+
+    private void BeginEventEdit(AdminMatchEventRow item)
+    {
+        editingEventId = item.Id;
+        eventEdits[item.Id] = new EventEditModel
+        {
+            EventType = item.EventType,
+            Minute = item.Minute,
+            TeamId = item.TeamId ?? editing?.HomeTeamId ?? Guid.Empty,
+            PlayerId = item.PlayerId,
+            PlayerName = item.PlayerName,
+            Notes = item.Notes ?? string.Empty
+        };
+    }
+
+    private void CancelEventEdit()
+    {
+        editingEventId = null;
+    }
+
+    private void OnEventEditTeamChanged(EventEditModel edit)
+    {
+        edit.PlayerId = null;
+        edit.PlayerName = string.Empty;
+    }
+
+    private void OnEventEditPlayerChanged(EventEditModel edit, ChangeEventArgs args)
+    {
+        var value = args.Value?.ToString();
+        edit.PlayerId = Guid.TryParse(value, out var playerId) ? playerId : null;
+        var selectedPlayer = allMatchEventPlayers.FirstOrDefault(x => x.Id == edit.PlayerId);
+        edit.PlayerName = selectedPlayer?.DisplayName ?? string.Empty;
+    }
+
     private async Task LoadEventPlayersAsync(Guid teamId)
     {
         eventPlayers.Clear();
@@ -644,6 +690,25 @@ else
             .ThenBy(x => x.DisplayName)
             .Select(x => new EventPlayerOption(
                 x.Id,
+                x.TeamId,
+                x.DisplayName,
+                x.ShirtNumber,
+                x.ShirtNumber != null ? $"#{x.ShirtNumber} {x.DisplayName}" : x.DisplayName))
+            .ToListAsync());
+    }
+
+    private async Task LoadAllMatchEventPlayersAsync(Guid homeTeamId, Guid awayTeamId)
+    {
+        allMatchEventPlayers.Clear();
+        allMatchEventPlayers.AddRange(await Db.Players
+            .AsNoTracking()
+            .Where(x => (x.TeamId == homeTeamId || x.TeamId == awayTeamId) && x.IsActive)
+            .OrderBy(x => x.TeamId)
+            .ThenBy(x => x.ShirtNumber ?? int.MaxValue)
+            .ThenBy(x => x.DisplayName)
+            .Select(x => new EventPlayerOption(
+                x.Id,
+                x.TeamId,
                 x.DisplayName,
                 x.ShirtNumber,
                 x.ShirtNumber != null ? $"#{x.ShirtNumber} {x.DisplayName}" : x.DisplayName))
@@ -658,7 +723,7 @@ else
         }
 
         successMessage = null;
-        errorMessage = Validate(editing);
+        errorMessage = await ValidateMatchEditAsync(editing);
         if (errorMessage is not null)
         {
             return;
@@ -703,7 +768,17 @@ else
                 return;
             }
 
+            if (!DateTime.TryParse(editing.StartsAtInput, out var startsAtLocal))
+            {
+                errorMessage = "Fecha/hora de partido invalida.";
+                return;
+            }
+
+            var startsAt = new DateTimeOffset(DateTime.SpecifyKind(startsAtLocal, DateTimeKind.Local)).ToUniversalTime();
             Db.Entry(match).Property(x => x.Status).CurrentValue = editing.Status;
+            Db.Entry(match).Property(x => x.StartsAt).CurrentValue = startsAt;
+            Db.Entry(match).Property(x => x.HomeTeamId).CurrentValue = editing.HomeTeamId;
+            Db.Entry(match).Property(x => x.AwayTeamId).CurrentValue = editing.AwayTeamId;
             await Db.SaveChangesAsync();
             await MatchScoreRecalculationService.RecalculateMatchScoreAndStandingsAsync(match.Id);
             var selectedMatchId = editing.MatchId;
@@ -726,6 +801,7 @@ else
     private async Task LoadSelectedEventsAsync(Guid matchId)
     {
         selectedEvents.Clear();
+        eventEdits.Clear();
         selectedEvents.AddRange(await Db.MatchEvents
             .AsNoTracking()
             .Include(x => x.Team)!.ThenInclude(x => x!.Club)
@@ -737,9 +813,25 @@ else
                 x.Id,
                 x.Type,
                 x.Minute,
+                x.TeamId,
                 x.Team != null ? x.Team.Club!.ShortName : "Sin equipo",
-                x.PlayerName != string.Empty ? x.PlayerName : x.Player != null ? x.Player.DisplayName : "Sin jugador"))
+                x.PlayerId,
+                x.PlayerName != string.Empty ? x.PlayerName : x.Player != null ? x.Player.DisplayName : "Sin jugador",
+                x.Notes))
             .ToListAsync());
+
+        foreach (var item in selectedEvents)
+        {
+            eventEdits[item.Id] = new EventEditModel
+            {
+                EventType = item.EventType,
+                Minute = item.Minute,
+                TeamId = item.TeamId ?? editing?.HomeTeamId ?? Guid.Empty,
+                PlayerId = item.PlayerId,
+                PlayerName = item.PlayerName,
+                Notes = item.Notes ?? string.Empty
+            };
+        }
     }
 
     private async Task CreateEventAsync()
@@ -750,7 +842,7 @@ else
         }
 
         successMessage = null;
-        errorMessage = Validate(eventForm, editing);
+        errorMessage = Validate(eventForm, editing, eventPlayers);
         if (errorMessage is not null)
         {
             return;
@@ -790,7 +882,8 @@ else
                     eventForm.Minute,
                     eventForm.TeamId,
                     eventForm.PlayerId,
-                    eventForm.PlayerName.Trim());
+                    eventForm.PlayerName.Trim(),
+                    eventForm.Notes?.Trim());
 
                 Db.MatchUpdateProposals.Add(MatchUpdateProposal.ForMatchEvent(
                     editing.MatchId,
@@ -801,6 +894,7 @@ else
                 await Db.SaveChangesAsync();
                 eventForm.PlayerName = string.Empty;
                 eventForm.PlayerId = null;
+                eventForm.Notes = string.Empty;
                 eventForm.Minute = 0;
                 await LoadPendingProposalsAsync();
                 successMessage = "Propuesta enviada para revision.";
@@ -813,6 +907,7 @@ else
                 eventForm.Minute,
                 eventForm.TeamId,
                 eventForm.PlayerId,
+                notes: eventForm.Notes?.Trim(),
                 playerName: eventForm.PlayerName));
 
             await Db.SaveChangesAsync();
@@ -825,6 +920,7 @@ else
             var selectedMatchId = editing.MatchId;
             eventForm.PlayerName = string.Empty;
             eventForm.PlayerId = null;
+            eventForm.Notes = string.Empty;
             eventForm.Minute = 0;
             await LoadMatchesAsync();
             await SelectMatchAsync(selectedMatchId);
@@ -905,6 +1001,75 @@ else
         await LoadSelectedEventsAsync(editing.MatchId);
         await NotifyMatchDataChangedAsync();
         successMessage = "Evento eliminado correctamente.";
+    }
+
+    private async Task SaveEventEditAsync(Guid eventId)
+    {
+        if (editing is null || !access.CanModerate || isSavingEvent)
+        {
+            return;
+        }
+
+        successMessage = null;
+        errorMessage = null;
+
+        if (!eventEdits.TryGetValue(eventId, out var edit))
+        {
+            errorMessage = "No se encontro la edicion del evento.";
+            return;
+        }
+
+        errorMessage = Validate(edit, editing, EventPlayersForTeam(edit.TeamId));
+        if (errorMessage is not null)
+        {
+            return;
+        }
+
+        if (!access.CanManageMatch(editing.HomeTeamId, editing.AwayTeamId))
+        {
+            errorMessage = "No tenes permisos para editar eventos de este partido.";
+            return;
+        }
+
+        var matchEvent = await Db.MatchEvents.FirstOrDefaultAsync(x => x.Id == eventId && x.MatchId == editing.MatchId);
+        if (matchEvent is null)
+        {
+            errorMessage = "No se encontro el evento seleccionado.";
+            return;
+        }
+
+        var oldType = matchEvent.Type;
+        isSavingEvent = true;
+        try
+        {
+            Db.Entry(matchEvent).Property(x => x.Type).CurrentValue = edit.EventType;
+            Db.Entry(matchEvent).Property(x => x.Minute).CurrentValue = edit.Minute;
+            Db.Entry(matchEvent).Property(x => x.TeamId).CurrentValue = edit.TeamId;
+            Db.Entry(matchEvent).Property(x => x.PlayerId).CurrentValue = edit.PlayerId;
+            Db.Entry(matchEvent).Property(x => x.PlayerName).CurrentValue = edit.PlayerName.Trim();
+            Db.Entry(matchEvent).Property(x => x.Notes).CurrentValue = string.IsNullOrWhiteSpace(edit.Notes) ? null : edit.Notes.Trim();
+            await Db.SaveChangesAsync();
+
+            if (oldType == MatchEventType.Goal || edit.EventType == MatchEventType.Goal)
+            {
+                await MatchScoreRecalculationService.RecalculateMatchScoreAndStandingsAsync(editing.MatchId);
+            }
+
+            var selectedMatchId = editing.MatchId;
+            editingEventId = null;
+            await LoadMatchesAsync();
+            await SelectMatchAsync(selectedMatchId);
+            await NotifyMatchDataChangedAsync();
+            successMessage = "Evento actualizado correctamente.";
+        }
+        catch (Exception)
+        {
+            errorMessage = "No se pudo actualizar el evento. Revisa los datos e intenta nuevamente.";
+        }
+        finally
+        {
+            isSavingEvent = false;
+        }
     }
 
     private async Task NotifyMatchDataChangedAsync()
@@ -1040,6 +1205,7 @@ else
                     addPayload.Minute,
                     addPayload.TeamId,
                     addPayload.PlayerId,
+                    notes: addPayload.Notes,
                     playerName: addPayload.PlayerName));
                 return addPayload.EventType == MatchEventType.Goal;
 
@@ -1058,18 +1224,67 @@ else
         }
     }
 
-    private static string? Validate(MatchEditModel model)
+    private async Task<string?> ValidateMatchEditAsync(MatchEditModel model)
     {
+        if (model.HomeTeamId == model.AwayTeamId)
+        {
+            return "Local y visitante deben ser distintos.";
+        }
+
+        if (!DateTime.TryParse(model.StartsAtInput, out var startsAtLocal))
+        {
+            return "Fecha/hora de partido invalida.";
+        }
+
+        if (!access.CanModerate)
+        {
+            return null;
+        }
+
+        var teamIds = await Db.Teams
+            .AsNoTracking()
+            .Where(x => x.CompetitionId == model.CompetitionId && x.IsActive && x.Club!.IsActive)
+            .Select(x => x.Id)
+            .ToListAsync();
+        if (!teamIds.Contains(model.HomeTeamId) || !teamIds.Contains(model.AwayTeamId))
+        {
+            return "Ambos equipos deben pertenecer a la competencia y estar activos.";
+        }
+
+        var teamAlreadyPlays = await Db.Matches
+            .AsNoTracking()
+            .AnyAsync(x =>
+                x.Id != model.MatchId &&
+                x.CompetitionId == model.CompetitionId &&
+                x.RoundId == model.RoundId &&
+                (x.HomeTeamId == model.HomeTeamId ||
+                    x.AwayTeamId == model.HomeTeamId ||
+                    x.HomeTeamId == model.AwayTeamId ||
+                    x.AwayTeamId == model.AwayTeamId));
+        if (teamAlreadyPlays)
+        {
+            return "Un equipo no puede jugar mas de un partido en la misma jornada de la competencia.";
+        }
+
+        var startsAt = new DateTimeOffset(DateTime.SpecifyKind(startsAtLocal, DateTimeKind.Local)).ToUniversalTime();
+        var duplicateMatch = await Db.Matches
+            .AsNoTracking()
+            .AnyAsync(x =>
+                x.Id != model.MatchId &&
+                x.CompetitionId == model.CompetitionId &&
+                x.HomeTeamId == model.HomeTeamId &&
+                x.AwayTeamId == model.AwayTeamId &&
+                x.StartsAt == startsAt);
+        if (duplicateMatch)
+        {
+            return "Ya existe un partido con el mismo local, visitante y fecha/hora.";
+        }
+
         return null;
     }
 
-    private static string? Validate(EventCreateModel model, MatchEditModel match)
+    private static string? Validate(EventCreateModel model, MatchEditModel match, IReadOnlyCollection<EventPlayerOption> teamPlayers)
     {
-        if (string.IsNullOrWhiteSpace(model.PlayerName))
-        {
-            return "Indica el jugador del evento.";
-        }
-
         if (model.Minute is < 0 or > 130)
         {
             return "El minuto debe estar entre 0 y 130.";
@@ -1083,6 +1298,66 @@ else
         if (!AllowedEventTypes.Contains(model.EventType))
         {
             return "El tipo de evento seleccionado no esta permitido.";
+        }
+
+        if (teamPlayers.Count > 0 && model.PlayerId is null)
+        {
+            return "Selecciona un jugador activo del plantel.";
+        }
+
+        if (model.PlayerId is not null && teamPlayers.All(x => x.Id != model.PlayerId))
+        {
+            return "El jugador seleccionado no pertenece al equipo o esta inactivo.";
+        }
+
+        if (teamPlayers.Count == 0 && string.IsNullOrWhiteSpace(model.PlayerName))
+        {
+            return "Indica el jugador del evento.";
+        }
+
+        if (model.PlayerId is not null && string.IsNullOrWhiteSpace(model.PlayerName))
+        {
+            return "No se pudo resolver el nombre snapshot del jugador.";
+        }
+
+        return null;
+    }
+
+    private static string? Validate(EventEditModel model, MatchEditModel match, IReadOnlyCollection<EventPlayerOption> teamPlayers)
+    {
+        if (model.Minute is < 0 or > 130)
+        {
+            return "El minuto debe estar entre 0 y 130.";
+        }
+
+        if (model.TeamId != match.HomeTeamId && model.TeamId != match.AwayTeamId)
+        {
+            return "El equipo seleccionado no pertenece al partido.";
+        }
+
+        if (!AllowedEventTypes.Contains(model.EventType))
+        {
+            return "El tipo de evento seleccionado no esta permitido.";
+        }
+
+        if (teamPlayers.Count > 0 && model.PlayerId is null)
+        {
+            return "Selecciona un jugador activo del plantel.";
+        }
+
+        if (model.PlayerId is not null && teamPlayers.All(x => x.Id != model.PlayerId))
+        {
+            return "El jugador seleccionado no pertenece al equipo o esta inactivo.";
+        }
+
+        if (teamPlayers.Count == 0 && string.IsNullOrWhiteSpace(model.PlayerName))
+        {
+            return "Indica el jugador del evento.";
+        }
+
+        if (model.PlayerId is not null && string.IsNullOrWhiteSpace(model.PlayerName))
+        {
+            return "No se pudo resolver el nombre snapshot del jugador.";
         }
 
         return null;
@@ -1123,6 +1398,13 @@ else
         _ => eventType.ToString()
     };
 
+    private static string EventPeriod(int minute) => minute switch
+    {
+        <= 45 => "1T",
+        <= 90 => "2T",
+        _ => "Extra"
+    };
+
     private static string ToJson<T>(T value) => JsonSerializer.Serialize(value, JsonOptions);
 
     private static T FromJson<T>(string json) =>
@@ -1158,7 +1440,12 @@ else
 
     private sealed record AdminMatchRow(
         Guid Id,
+        Guid CompetitionId,
+        Guid LeagueId,
+        string LeagueName,
+        string SeasonName,
         string CompetitionName,
+        Guid RoundId,
         string RoundName,
         Guid HomeTeamId,
         string HomeTeamName,
@@ -1172,13 +1459,19 @@ else
     private sealed class MatchEditModel
     {
         public Guid MatchId { get; set; }
+        public Guid CompetitionId { get; set; }
+        public Guid LeagueId { get; set; }
+        public string LeagueName { get; set; } = string.Empty;
+        public string SeasonName { get; set; } = string.Empty;
         public string CompetitionName { get; set; } = string.Empty;
+        public Guid RoundId { get; set; }
         public string RoundName { get; set; } = string.Empty;
         public Guid HomeTeamId { get; set; }
         public string HomeTeamName { get; set; } = string.Empty;
         public Guid AwayTeamId { get; set; }
         public string AwayTeamName { get; set; } = string.Empty;
         public DateTimeOffset StartsAt { get; set; }
+        public string StartsAtInput { get; set; } = string.Empty;
         public MatchStatus Status { get; set; }
 
         [Range(0, int.MaxValue, ErrorMessage = "Los goles local no pueden ser negativos.")]
@@ -1192,14 +1485,20 @@ else
         Guid Id,
         MatchEventType EventType,
         int Minute,
+        Guid? TeamId,
         string TeamName,
-        string PlayerName);
+        Guid? PlayerId,
+        string PlayerName,
+        string? Notes);
 
     private sealed record EventPlayerOption(
         Guid Id,
+        Guid TeamId,
         string DisplayName,
         int? ShirtNumber,
         string Label);
+
+    private sealed record TeamOption(Guid Id, string Label);
 
     private sealed record PendingProposalRow(
         Guid Id,
@@ -1207,11 +1506,6 @@ else
         string ProposedBy,
         DateTimeOffset CreatedAt,
         string Description);
-
-    private sealed record ClubLogoOption(
-        Guid Id,
-        string Name,
-        string? LogoPath);
 
     private sealed class EventCreateModel
     {
@@ -1225,5 +1519,17 @@ else
 
         [Range(0, 130, ErrorMessage = "El minuto debe estar entre 0 y 130.")]
         public int Minute { get; set; }
+
+        public string? Notes { get; set; }
+    }
+
+    private sealed class EventEditModel
+    {
+        public MatchEventType EventType { get; set; }
+        public int Minute { get; set; }
+        public Guid TeamId { get; set; }
+        public Guid? PlayerId { get; set; }
+        public string PlayerName { get; set; } = string.Empty;
+        public string? Notes { get; set; }
     }
 }
