@@ -1,0 +1,42 @@
+<span class="@CssClass" aria-label="@ResolvedLabel" title="@ResolvedLabel">@ResolvedText</span>
+
+@code {
+    [Parameter] public MatchEventType EventType { get; set; }
+    [Parameter] public bool IsSecondYellow { get; set; }
+    [Parameter] public bool Compact { get; set; }
+    [Parameter] public string? Label { get; set; }
+
+    private string ResolvedText => IsSecondYellow
+        ? "2Y"
+        : EventType switch
+        {
+            MatchEventType.Goal => "G",
+            MatchEventType.YellowCard => "Y",
+            MatchEventType.RedCard => "R",
+            _ => "-"
+        };
+
+    private string ResolvedLabel => !string.IsNullOrWhiteSpace(Label)
+        ? Label
+        : IsSecondYellow
+            ? "2da amarilla / expulsion"
+            : EventType switch
+            {
+                MatchEventType.Goal => "Goal",
+                MatchEventType.YellowCard => "Yellow card",
+                MatchEventType.RedCard => "Red card",
+                _ => EventType.ToString()
+            };
+
+    private string CssClass => IsSecondYellow
+        ? $"match-event-icon match-event-icon--second-yellow{(Compact ? " match-event-icon--compact" : string.Empty)}"
+        : $"match-event-icon match-event-icon--{EventVariant}{(Compact ? " match-event-icon--compact" : string.Empty)}";
+
+    private string EventVariant => EventType switch
+    {
+        MatchEventType.Goal => "goal",
+        MatchEventType.YellowCard => "yellow",
+        MatchEventType.RedCard => "red",
+        _ => "neutral"
+    };
+}

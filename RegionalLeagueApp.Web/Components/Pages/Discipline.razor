@@ -1,0 +1,88 @@
+@page "/discipline"
+@page "/suspensions"
+@rendermode InteractiveServer
+@using Microsoft.EntityFrameworkCore
+@using RegionalLeagueApp.Application.Discipline
+@inject ApplicationDbContext Db
+@inject IDisciplineQueryService DisciplineQueryService
+
+<PageTitle>Disciplina</PageTitle>
+
+<div class="page-heading">
+    <p class="eyebrow">Disciplina</p>
+    <h1>@PageTitleText</h1>
+</div>
+
+@if (rows.Count == 0)
+{
+    <EmptyState Text="Todavia no hay tarjetas asociadas a jugadores." />
+}
+else
+{
+    @foreach (var group in rows.GroupBy(x => new { x.CompetitionId, x.CompetitionName }).OrderBy(x => x.Key.CompetitionName))
+    {
+        <section class="panel table-panel discipline-table section-gap">
+            <div class="standings-section-title">
+                <h2>@group.Key.CompetitionName</h2>
+                <span>@group.Count() jugador(es)</span>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Jugador</th>
+                        <th>Club / equipo</th>
+                        <th>Amarillas</th>
+                        <th>Rojas</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in group.OrderByDescending(x => x.Status).ThenByDescending(x => x.YellowCards).ThenByDescending(x => x.RedCards).ThenBy(x => x.PlayerName))
+                    {
+                        <tr class="@DisciplineRowClass(row.Status)">
+                            <td><a href="players/@row.PlayerId">@row.PlayerName</a></td>
+                            <td>
+                                <a href="clubs/@row.ClubId">@row.ClubName</a>
+                                <small>@row.TeamName</small>
+                            </td>
+                            <td><strong>@row.YellowCards</strong></td>
+                            <td><strong>@row.RedCards</strong></td>
+                            <td><StatusBadge DisciplineStatusValue="row.Status" Compact="true" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </section>
+    }
+}
+
+@code {
+    [SupplyParameterFromQuery] public Guid? LeagueId { get; set; }
+
+    private IReadOnlyList<DisciplineRowDto> rows = [];
+    private string? leagueName;
+
+    private string PageTitleText => string.IsNullOrWhiteSpace(leagueName)
+        ? "Sanciones y tarjetas"
+        : $"Sanciones y tarjetas - {leagueName}";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        leagueName = LeagueId is null
+            ? null
+            : await Db.Leagues
+                .AsNoTracking()
+                .Where(x => x.Id == LeagueId)
+                .Select(x => x.Name)
+                .FirstOrDefaultAsync();
+
+        rows = await DisciplineQueryService.GetDisciplineAsync(LeagueId);
+    }
+
+    private static string DisciplineRowClass(DisciplineStatus status) => status switch
+    {
+        DisciplineStatus.Suspended => "discipline-row--suspended",
+        DisciplineStatus.Warned => "discipline-row--warned",
+        _ => string.Empty
+    };
+}

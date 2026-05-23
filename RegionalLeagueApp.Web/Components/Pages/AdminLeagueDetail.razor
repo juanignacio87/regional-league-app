@@ -30,12 +30,7 @@ else
         </div>
     </section>
 
-    @if (!string.IsNullOrWhiteSpace(statusMessage))
-    {
-        <div class="leagues-message @(isSuccessMessage ? "leagues-message--success" : "leagues-message--error")">
-            @statusMessage
-        </div>
-    }
+    <FormMessage Message="@statusMessage" Variant="@(isSuccessMessage ? "success" : "danger")" />
 
     <section class="leagues-summary admin-league-summary">
         <article>
@@ -65,13 +60,7 @@ else
 
             <div class="admin-league-sections">
                 <section class="league-ops-card admin-league-panel">
-                    <div class="admin-league-panel__header">
-                        <div>
-                            <p class="eyebrow">Liga -> Temporadas</p>
-                            <h2>Temporadas</h2>
-                        </div>
-                        <span>@DisplaySeasons.Count cargada(s)</span>
-                    </div>
+                    <PanelHeader Eyebrow="Liga -> Temporadas" Title="Temporadas" Meta="@($"{DisplaySeasons.Count} cargada(s)")" />
                     <div class="admin-compact-list">
                         @if (DisplaySeasons.Count == 0)
                         {
@@ -95,13 +84,7 @@ else
                 </section>
 
                 <section class="league-ops-card admin-league-panel">
-                    <div class="admin-league-panel__header">
-                        <div>
-                            <p class="eyebrow">Temporadas -> Competencias</p>
-                            <h2>Competencias</h2>
-                        </div>
-                        <span>@competitions.Count cargada(s)</span>
-                    </div>
+                    <PanelHeader Eyebrow="Temporadas -> Competencias" Title="Competencias" Meta="@($"{competitions.Count} cargada(s)")" />
                     <div class="admin-compact-list">
                         @if (competitions.Count == 0)
                         {
@@ -134,13 +117,7 @@ else
                 </section>
 
                 <section class="league-ops-card admin-league-panel">
-                    <div class="admin-league-panel__header">
-                        <div>
-                            <p class="eyebrow">Competencias -> Equipos</p>
-                            <h2>Equipos participantes</h2>
-                        </div>
-                        <span>@participants.Count participante(s)</span>
-                    </div>
+                    <PanelHeader Eyebrow="Competencias -> Equipos" Title="Equipos participantes" Meta="@($"{participants.Count} participante(s)")" />
                     <div class="admin-compact-list">
                         @if (participants.Count == 0)
                         {

@@ -39,7 +39,7 @@ else
             </div>
 
             <div class="match-center-score">
-                <span class="match-center-status @StatusClass(match.Status)">@StatusLabel(match.Status)</span>
+                <StatusBadge MatchStatusValue="match.Status" />
                 <strong>@ScoreText(match)</strong>
                 <small>@(match.Round?.Name ?? "Sin fecha")</small>
             </div>
@@ -54,10 +54,7 @@ else
 
     <section class="match-center-grid">
         <article class="panel match-center-timeline">
-            <div class="panel-title">
-                <h2>Timeline</h2>
-                <span class="match-center-total">@TimelineEvents.Count eventos</span>
-            </div>
+            <PanelHeader Title="Timeline" Meta="@($"{TimelineEvents.Count} eventos")" />
 
             @if (TimelineEvents.Count == 0)
             {
@@ -70,7 +67,11 @@ else
                     {
                         <div class="match-timeline-event @(IsHomeEvent(item) ? "match-timeline-event--home" : "match-timeline-event--away")">
                             <div class="match-timeline-body">
-                                <strong>@EventLabel(item.Type)</strong>
+                                <strong>@EventLabel(item)</strong>
+                                @if (IsSecondYellowCard(item))
+                                {
+                                    <span class="second-yellow-badge">2da amarilla / expulsion</span>
+                                }
                                 <small>
                                     @if (item.PlayerId is not null)
                                     {
@@ -83,7 +84,7 @@ else
                                 </small>
                             </div>
                             <span class="match-timeline-minute">@item.Minute'</span>
-                            <span class="match-timeline-icon @EventIconClass(item.Type)">@EventIconText(item.Type)</span>
+                            <MatchEventIcon EventType="item.Type" IsSecondYellow="IsSecondYellowCard(item)" />
                             <span class="match-timeline-team">@TeamShortName(item)</span>
                         </div>
                     }
@@ -204,29 +205,34 @@ else
     private static string ScoreText(Match item) =>
         item.HomeScore is null || item.AwayScore is null ? "vs" : $"{item.HomeScore}-{item.AwayScore}";
 
-    private static string EventIconText(MatchEventType eventType) => eventType switch
-    {
-        MatchEventType.Goal => "G",
-        MatchEventType.YellowCard => "Y",
-        MatchEventType.RedCard => "R",
-        _ => "-"
-    };
-
-    private static string EventIconClass(MatchEventType eventType) => eventType switch
-    {
-        MatchEventType.Goal => "match-timeline-icon--goal",
-        MatchEventType.YellowCard => "match-timeline-icon--yellow",
-        MatchEventType.RedCard => "match-timeline-icon--red",
-        _ => string.Empty
-    };
-
-    private static string EventLabel(MatchEventType eventType) => eventType switch
+    private string EventLabel(MatchEvent item) => IsSecondYellowCard(item)
+        ? "Second yellow"
+        : item.Type switch
     {
         MatchEventType.Goal => "Goal",
         MatchEventType.YellowCard => "Yellow card",
         MatchEventType.RedCard => "Red card",
-        _ => eventType.ToString()
+        _ => item.Type.ToString()
     };
+
+    private bool IsSecondYellowCard(MatchEvent item)
+    {
+        if (item.Type != MatchEventType.YellowCard || item.PlayerId is null)
+        {
+            return false;
+        }
+
+        var orderedEvents = TimelineEvents;
+        var itemIndex = orderedEvents.ToList().FindIndex(x => x.Id == item.Id);
+        if (itemIndex < 0)
+        {
+            return false;
+        }
+
+        return orderedEvents
+            .Take(itemIndex + 1)
+            .Count(x => x.PlayerId == item.PlayerId && x.Type == MatchEventType.YellowCard) == 2;
+    }
 
     private static string PlayerText(MatchEvent item) =>
         !string.IsNullOrWhiteSpace(item.PlayerName)
@@ -252,13 +258,6 @@ else
         MatchStatus.Live or MatchStatus.HalfTime => "Live",
         MatchStatus.Finished => "Finished",
         _ => status.ToString()
-    };
-
-    private static string StatusClass(MatchStatus status) => status switch
-    {
-        MatchStatus.Live or MatchStatus.HalfTime => "match-center-status--live",
-        MatchStatus.Finished => "match-center-status--finished",
-        _ => "match-center-status--scheduled"
     };
 
     private bool IsHomeEvent(MatchEvent item) => match?.HomeTeamId == item.TeamId;

@@ -1,0 +1,60 @@
+@using RegionalLeagueApp.Application.Discipline
+
+<span class="@CssClass">@ResolvedText</span>
+
+@code {
+    [Parameter] public MatchStatus? MatchStatusValue { get; set; }
+    [Parameter] public DisciplineStatus? DisciplineStatusValue { get; set; }
+    [Parameter] public string? Text { get; set; }
+    [Parameter] public string? Variant { get; set; }
+    [Parameter] public bool Compact { get; set; }
+
+    private string ResolvedText => !string.IsNullOrWhiteSpace(Text)
+        ? Text
+        : MatchStatusValue is not null
+            ? MatchStatusText(MatchStatusValue.Value)
+            : DisciplineStatusValue is not null
+                ? DisciplineStatusText(DisciplineStatusValue.Value)
+                : string.Empty;
+
+    private string ResolvedVariant => !string.IsNullOrWhiteSpace(Variant)
+        ? Variant
+        : MatchStatusValue is not null
+            ? MatchStatusVariant(MatchStatusValue.Value)
+            : DisciplineStatusValue is not null
+                ? DisciplineStatusVariant(DisciplineStatusValue.Value)
+                : "neutral";
+
+    private string CssClass => $"ui-badge ui-badge--{ResolvedVariant}{(Compact ? " ui-badge--compact" : string.Empty)}";
+
+    private static string MatchStatusText(MatchStatus status) => status switch
+    {
+        MatchStatus.Scheduled => "Scheduled",
+        MatchStatus.Live or MatchStatus.HalfTime => "Live",
+        MatchStatus.Finished => "Finished",
+        _ => status.ToString()
+    };
+
+    private static string MatchStatusVariant(MatchStatus status) => status switch
+    {
+        MatchStatus.Live or MatchStatus.HalfTime => "live",
+        MatchStatus.Finished => "finished",
+        MatchStatus.Cancelled or MatchStatus.Suspended => "danger",
+        MatchStatus.Postponed => "warning",
+        _ => "scheduled"
+    };
+
+    private static string DisciplineStatusText(DisciplineStatus status) => status switch
+    {
+        DisciplineStatus.Suspended => "Suspendido",
+        DisciplineStatus.Warned => "Advertido",
+        _ => "Limpio"
+    };
+
+    private static string DisciplineStatusVariant(DisciplineStatus status) => status switch
+    {
+        DisciplineStatus.Suspended => "danger",
+        DisciplineStatus.Warned => "warning",
+        _ => "success"
+    };
+}

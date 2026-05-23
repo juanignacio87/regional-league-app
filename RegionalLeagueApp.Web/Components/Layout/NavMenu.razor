@@ -15,26 +15,31 @@
             <span></span>
         </label>
 
-        <nav class="rl-navbar__links" onclick="document.getElementById('rl-navbar-toggle')?.click()">
+        <nav class="rl-navbar__links">
             <NavLink class="rl-navbar__link" href="" Match="NavLinkMatch.All">Inicio</NavLink>
             <NavLink class="rl-navbar__link" href="leagues">Ligas</NavLink>
             <NavLink class="rl-navbar__link" href="fixture">Fixture</NavLink>
             <NavLink class="rl-navbar__link" href="results">Resultados</NavLink>
             <NavLink class="rl-navbar__link" href="standings">Tabla</NavLink>
             <NavLink class="rl-navbar__link" href="clubs">Clubes</NavLink>
-            <NavLink class="rl-navbar__link" href="scorers">Goleadores</NavLink>
-
-            <AuthorizeView Roles="@AppRoles.Admin">
-                <Authorized>
-                    <NavLink class="rl-navbar__link rl-navbar__link--admin" href="admin">Admin</NavLink>
-                </Authorized>
-            </AuthorizeView>
+            <details class="rl-navbar__more">
+                <summary class="rl-navbar__link">Mas</summary>
+                <div class="rl-navbar__more-menu">
+                    <NavLink class="rl-navbar__link" href="scorers">Goleadores</NavLink>
+                    <NavLink class="rl-navbar__link" href="discipline">Disciplina</NavLink>
+                </div>
+            </details>
         </nav>
 
         <div class="rl-navbar__account">
             <AuthorizeView>
                 <Authorized Context="auth">
                     <span class="rl-navbar__account-name">@auth.User.Identity?.Name</span>
+                    <AuthorizeView Roles="@AppRoles.Admin">
+                        <Authorized>
+                            <NavLink class="rl-navbar__account-button rl-navbar__account-button--admin" href="admin">Admin</NavLink>
+                        </Authorized>
+                    </AuthorizeView>
                     <form method="post" action="/account/logout">
                         <button type="submit" class="rl-navbar__account-button">Salir</button>
                     </form>

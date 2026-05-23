@@ -4,12 +4,14 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using RegionalLeagueApp.Application.Abstractions.Data;
 using RegionalLeagueApp.Application.Collaboration;
+using RegionalLeagueApp.Application.Discipline;
 using RegionalLeagueApp.Application.Fixtures;
 using RegionalLeagueApp.Infrastructure.Collaboration;
 using RegionalLeagueApp.Application.Matches;
 using RegionalLeagueApp.Application.Players;
 using RegionalLeagueApp.Application.Standings;
 using RegionalLeagueApp.Infrastructure.Fixtures;
+using RegionalLeagueApp.Infrastructure.Discipline;
 using RegionalLeagueApp.Infrastructure.Identity;
 using RegionalLeagueApp.Infrastructure.Matches;
 using RegionalLeagueApp.Infrastructure.Persistence;
@@ -52,6 +54,7 @@ public static class DependencyInjection
         services.AddScoped<IMatchScoreRecalculationService, EfMatchScoreRecalculationService>();
         services.AddScoped<IFixtureCsvImportService, EfFixtureCsvImportService>();
         services.AddScoped<IPlayerCsvImportService, EfPlayerCsvImportService>();
+        services.AddScoped<IDisciplineQueryService, EfDisciplineQueryService>();
         services.AddScoped<IStandingsQueryService, EfStandingsQueryService>();
         services.AddScoped<IStandingsRecalculationService, EfStandingsRecalculationService>();
         services.Configure<DevelopmentSeedOptions>(options =>

@@ -1,0 +1,15 @@
+@if (!string.IsNullOrWhiteSpace(Message))
+{
+    <div class="@CssClass" role="@Role" aria-live="@AriaLive">
+        @Message
+    </div>
+}
+
+@code {
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public string Variant { get; set; } = "neutral";
+
+    private string CssClass => $"ui-form-message ui-form-message--{Variant}";
+    private string Role => Variant is "danger" or "error" ? "alert" : "status";
+    private string AriaLive => Variant is "danger" or "error" ? "assertive" : "polite";
+}

@@ -1,6 +1,7 @@
 .rl-navbar {
     background: rgba(255, 255, 255, .97);
     border-bottom: 1px solid #dfe8e5;
+    overflow: visible;
     position: sticky;
     top: 0;
     z-index: 20;
@@ -9,12 +10,13 @@
 .rl-navbar__inner {
     align-items: center;
     display: grid;
-    gap: 1rem;
+    gap: .65rem;
     grid-template-columns: auto minmax(0, 1fr) auto;
     margin: 0 auto;
-    max-width: 1180px;
+    max-width: 1320px;
     min-height: 72px;
-    padding: 0 1.25rem;
+    overflow: visible;
+    padding: 0 .9rem;
 }
 
 .rl-navbar__brand,
@@ -26,8 +28,8 @@
 
 .rl-navbar__brand {
     color: #10231f;
-    gap: .75rem;
-    min-width: 210px;
+    gap: .55rem;
+    min-width: 170px;
     text-decoration: none;
 }
 
@@ -42,9 +44,9 @@
     color: #fff;
     display: inline-flex;
     font-weight: 800;
-    height: 42px;
+    height: 38px;
     justify-content: center;
-    width: 42px;
+    width: 38px;
 }
 
 .rl-navbar__brand-text strong,
@@ -60,10 +62,10 @@
 }
 
 .rl-navbar__links {
-    gap: .25rem;
+    gap: .1rem;
     justify-content: center;
     min-width: 0;
-    overflow-x: auto;
+    overflow: visible;
     scrollbar-width: none;
 }
 
@@ -75,10 +77,10 @@
     border-radius: 999px;
     color: #334541;
     flex: 0 0 auto;
-    font-size: .92rem;
+    font-size: .86rem;
     font-weight: 700;
     line-height: 1.2;
-    padding: .55rem .85rem;
+    padding: .48rem .55rem;
     text-decoration: none;
     white-space: nowrap;
 }
@@ -89,12 +91,59 @@
     color: #0f4f43;
 }
 
-.rl-navbar__links ::deep .rl-navbar__link--admin {
-    color: #7c2d12;
+.rl-navbar__more {
+    flex: 0 0 auto;
+    position: relative;
+    z-index: 35;
+}
+
+.rl-navbar__more summary {
+    cursor: pointer;
+    list-style: none;
+}
+
+.rl-navbar__more summary::-webkit-details-marker {
+    display: none;
+}
+
+.rl-navbar__more-menu {
+    background: #fff;
+    border: 1px solid #dfe8e5;
+    border-radius: 8px;
+    box-shadow: 0 12px 32px rgba(16, 35, 31, .12);
+    display: grid;
+    gap: .2rem;
+    min-width: 150px;
+    padding: .35rem;
+    position: absolute;
+    right: 0;
+    top: calc(100% + .4rem);
+    z-index: 100;
+    animation: rl-navbar-menu-in .12s ease-out;
+}
+
+.rl-navbar__more:not([open]) .rl-navbar__more-menu {
+    display: none;
+}
+
+.rl-navbar__more-menu ::deep .rl-navbar__link {
+    display: block;
+}
+
+@keyframes rl-navbar-menu-in {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .rl-navbar__account {
-    gap: .6rem;
+    gap: .4rem;
     justify-content: end;
     min-width: 0;
 }
@@ -105,8 +154,8 @@
 
 .rl-navbar__account-name {
     color: #60716d;
-    font-size: .85rem;
-    max-width: 150px;
+    font-size: .8rem;
+    max-width: 100px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -118,10 +167,10 @@
     border-radius: 999px;
     color: #fff;
     display: inline-block;
-    font-size: .9rem;
+    font-size: .85rem;
     font-weight: 800;
     line-height: 1.2;
-    padding: .55rem .85rem;
+    padding: .5rem .65rem;
     text-decoration: none;
     white-space: nowrap;
 }
@@ -131,12 +180,33 @@
     color: #fff;
 }
 
+.rl-navbar__account-button--admin {
+    background: #fff7ed;
+    color: #7c2d12;
+}
+
+.rl-navbar__account-button--admin:hover {
+    background: #fed7aa;
+    color: #7c2d12;
+}
+
 .rl-navbar__toggle-input {
     display: none !important;
 }
 
 .rl-navbar__toggle-button {
     display: none;
+}
+
+@media (max-width: 1180px) {
+    .rl-navbar__brand-text small,
+    .rl-navbar__account-name {
+        display: none;
+    }
+
+    .rl-navbar__brand {
+        min-width: 0;
+    }
 }
 
 @media (max-width: 960px) {
@@ -188,8 +258,22 @@
         display: none;
         grid-column: 1 / -1;
         grid-row: 2;
+        flex-wrap: wrap;
         justify-content: start;
         padding: .75rem 0 0;
+    }
+
+    .rl-navbar__more {
+        width: 100%;
+    }
+
+    .rl-navbar__more-menu {
+        border: 0;
+        box-shadow: none;
+        display: flex;
+        flex-wrap: wrap;
+        padding: .35rem 0 0;
+        position: static;
     }
 
     .rl-navbar__toggle-input:checked ~ .rl-navbar__links {

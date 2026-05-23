@@ -7,12 +7,14 @@
 @using Microsoft.AspNetCore.SignalR
 @using Microsoft.EntityFrameworkCore
 @using RegionalLeagueApp.Application.Collaboration
+@using RegionalLeagueApp.Application.Discipline
 @using RegionalLeagueApp.Application.Matches
 @using RegionalLeagueApp.Domain.Collaboration
 @using RegionalLeagueApp.Web.Hubs
 @inject ApplicationDbContext Db
 @inject IMatchAdministrationPermissionService PermissionService
 @inject IMatchScoreRecalculationService MatchScoreRecalculationService
+@inject IDisciplineQueryService DisciplineQueryService
 @inject IHubContext<MatchUpdatesHub> MatchUpdates
 @inject ILogger<Admin> Logger
 @inject NavigationManager Navigation
@@ -66,15 +68,8 @@
     }
 }
 
-@if (!string.IsNullOrWhiteSpace(successMessage))
-{
-    <div class="alert alert-success admin-feedback" role="status" aria-live="polite">@successMessage</div>
-}
-
-@if (!string.IsNullOrWhiteSpace(errorMessage))
-{
-    <div class="alert alert-danger admin-feedback" role="alert">@errorMessage</div>
-}
+<FormMessage Message="@successMessage" Variant="success" />
+<FormMessage Message="@errorMessage" Variant="danger" />
 
 @if (!IsMatchAdminRoute && access.CanModerate)
 {
@@ -135,7 +130,7 @@
                         <small>Local</small>
                     </div>
                     <div class="admin-match-score">
-                        <span class="status-pill @StatusClass(editing.Status)">@editing.Status</span>
+                        <StatusBadge MatchStatusValue="editing.Status" Compact="true" />
                         <strong>@ScoreText(editing.HomeScore, editing.AwayScore)</strong>
                         <small>@editing.StartsAt.LocalDateTime.ToString("dd/MM/yyyy HH:mm")</small>
                     </div>
@@ -153,10 +148,7 @@
             <section class="admin-match-layout">
                 <article class="panel admin-match-editor">
                     <div class="panel-title-row">
-                        <div>
-                            <p class="eyebrow">Partido</p>
-                            <h2>Datos operativos</h2>
-                        </div>
+                        <PanelHeader Eyebrow="Partido" Title="Datos operativos" />
                     </div>
 
                     <EditForm Model="editing" OnValidSubmit="SaveAsync" class="admin-form" aria-busy="@isSaving">
@@ -207,11 +199,7 @@
 
                 <article class="panel admin-events">
                     <div class="panel-title-row">
-                        <div>
-                            <p class="eyebrow">Eventos</p>
-                            <h2>Linea de tiempo</h2>
-                        </div>
-                        <span>@selectedEvents.Count eventos</span>
+                        <PanelHeader Eyebrow="Eventos" Title="Linea de tiempo" Meta="@($"{selectedEvents.Count} eventos")" />
                     </div>
 
                     @if (selectedEvents.Count == 0)
@@ -239,15 +227,22 @@
                                         <article class="admin-event-row @(editingEventId == item.Id ? "admin-event-row--editing" : string.Empty)">
                                             <div class="admin-event-main">
                                                 <strong>@item.Minute'</strong>
-                                                <span>@EventLabel(item.EventType)</span>
+                                                <span class="admin-event-kind">
+                                                    <MatchEventIcon EventType="item.EventType" IsSecondYellow="IsSecondYellowCard(item)" Compact="true" />
+                                                    @EventLabel(item)
+                                                    @if (IsSecondYellowCard(item))
+                                                    {
+                                                        <small class="second-yellow-badge">2da amarilla</small>
+                                                    }
+                                                </span>
                                                 <small>@item.TeamName</small>
                                                 <small>@item.PlayerName</small>
                                                 <span class="admin-event-note">@(!string.IsNullOrWhiteSpace(item.Notes) ? item.Notes : "-")</span>
-                                                <div class="admin-event-actions">
-                                                    @if (access.CanModerate)
-                                                    {
-                                                        <button type="button" class="admin-link-button" @onclick="() => BeginEventEdit(item)">Editar</button>
-                                                    }
+                                                    <div class="admin-event-actions">
+                                                        @if (access.CanModerate)
+                                                        {
+                                                            <button type="button" class="admin-link-button" @onclick="async () => await BeginEventEditAsync(item)">Editar</button>
+                                                        }
                                                     <button type="button" class="admin-link-button admin-link-button-muted" @onclick="async () => await DeleteEventAsync(item.Id)">@(access.CanModerate ? "Quitar evento" : "Proponer quitar")</button>
                                                 </div>
                                             </div>
@@ -275,19 +270,23 @@
                                                         </label>
                                                         <label>
                                                             Jugador
-                                                            @if (EventPlayersForTeam(edit.TeamId).Count == 0)
+                                                            @if (EventPlayersForTeam(edit.TeamId, edit.PlayerId).Count == 0)
                                                             {
                                                                 <InputText class="form-control" @bind-Value="edit.PlayerName" placeholder="Nombre del jugador" />
                                                             }
                                                             else
                                                             {
-                                                                <select class="form-control" value="@edit.PlayerId" @onchange="e => OnEventEditPlayerChanged(edit, e)">
+                                                                <select class="form-control" value="@edit.PlayerId" @onchange="async e => await OnEventEditPlayerChangedAsync(item.Id, edit, e)">
                                                                     <option value="">Seleccionar jugador</option>
-                                                                    @foreach (var player in EventPlayersForTeam(edit.TeamId))
+                                                                    @foreach (var player in EventPlayersForTeam(edit.TeamId, edit.PlayerId))
                                                                     {
                                                                         <option value="@player.Id">@player.Label</option>
                                                                     }
                                                                 </select>
+                                                                @if (eventEditDiscipline.GetValueOrDefault(item.Id)?.Status == DisciplineStatus.Suspended)
+                                                                {
+                                                                    <small class="admin-discipline-warning">Suspendido por acumulacion disciplinaria en esta competencia.</small>
+                                                                }
                                                             }
                                                         </label>
                                                         <label>Nota <InputText class="form-control" @bind-Value="edit.Notes" /></label>
@@ -342,6 +341,10 @@
                                         }
                                     </InputSelect>
                                     <ValidationMessage For="() => eventForm.PlayerId" />
+                                    @if (selectedEventPlayerDiscipline?.Status == DisciplineStatus.Suspended)
+                                    {
+                                        <small class="admin-discipline-warning">Suspendido por acumulacion disciplinaria en esta competencia.</small>
+                                    }
                                 }
                             </label>
                             <label>
@@ -397,7 +400,9 @@ else
     private readonly List<AdminMatchEventRow> selectedEvents = [];
     private readonly List<EventPlayerOption> eventPlayers = [];
     private readonly List<EventPlayerOption> allMatchEventPlayers = [];
+    private readonly HashSet<Guid> unavailableEventPlayerIds = [];
     private readonly Dictionary<Guid, EventEditModel> eventEdits = [];
+    private readonly Dictionary<Guid, DisciplineRowDto?> eventEditDiscipline = [];
     private readonly List<PendingProposalRow> pendingProposals = [];
     private readonly List<TeamOption> matchTeamOptions = [];
     private MatchAdministrationAccess access = MatchAdministrationAccess.Empty;
@@ -405,6 +410,7 @@ else
     private bool isSavingEvent;
     private bool isReviewingProposal;
     private Guid? editingEventId;
+    private DisciplineRowDto? selectedEventPlayerDiscipline;
     private string? successMessage;
     private string? errorMessage;
     private string statusFilter = string.Empty;
@@ -583,6 +589,7 @@ else
             TeamId = match.HomeTeamId,
             EventType = MatchEventType.Goal
         };
+        selectedEventPlayerDiscipline = null;
 
         await LoadMatchTeamOptionsAsync(match.CompetitionId);
         await LoadSelectedEventsAsync(match.Id);
@@ -613,17 +620,22 @@ else
     {
         eventForm.PlayerId = null;
         eventForm.PlayerName = string.Empty;
+        selectedEventPlayerDiscipline = null;
         await LoadEventPlayersAsync(eventForm.TeamId);
     }
 
-    private void OnEventPlayerChanged()
+    private async Task OnEventPlayerChanged()
     {
         var selectedPlayer = eventPlayers.FirstOrDefault(x => x.Id == eventForm.PlayerId);
         eventForm.PlayerName = selectedPlayer?.DisplayName ?? string.Empty;
+        selectedEventPlayerDiscipline = editing is not null && eventForm.PlayerId is { } playerId
+            ? await DisciplineQueryService.GetPlayerDisciplineForMatchAsync(editing.MatchId, playerId)
+            : null;
     }
 
-    private List<EventPlayerOption> EventPlayersForTeam(Guid teamId) => allMatchEventPlayers
+    private List<EventPlayerOption> EventPlayersForTeam(Guid teamId, Guid? currentPlayerId = null) => allMatchEventPlayers
         .Where(x => x.TeamId == teamId)
+        .Where(x => !unavailableEventPlayerIds.Contains(x.Id) || x.Id == currentPlayerId)
         .OrderBy(x => x.ShirtNumber ?? int.MaxValue)
         .ThenBy(x => x.DisplayName)
         .ToList();
@@ -647,7 +659,7 @@ else
         return edit;
     }
 
-    private void BeginEventEdit(AdminMatchEventRow item)
+    private async Task BeginEventEditAsync(AdminMatchEventRow item)
     {
         editingEventId = item.Id;
         eventEdits[item.Id] = new EventEditModel
@@ -659,6 +671,7 @@ else
             PlayerName = item.PlayerName,
             Notes = item.Notes ?? string.Empty
         };
+        await LoadEventEditDisciplineAsync(item.Id, eventEdits[item.Id]);
     }
 
     private void CancelEventEdit()
@@ -672,12 +685,20 @@ else
         edit.PlayerName = string.Empty;
     }
 
-    private void OnEventEditPlayerChanged(EventEditModel edit, ChangeEventArgs args)
+    private async Task OnEventEditPlayerChangedAsync(Guid eventId, EventEditModel edit, ChangeEventArgs args)
     {
         var value = args.Value?.ToString();
         edit.PlayerId = Guid.TryParse(value, out var playerId) ? playerId : null;
         var selectedPlayer = allMatchEventPlayers.FirstOrDefault(x => x.Id == edit.PlayerId);
         edit.PlayerName = selectedPlayer?.DisplayName ?? string.Empty;
+        await LoadEventEditDisciplineAsync(eventId, edit);
+    }
+
+    private async Task LoadEventEditDisciplineAsync(Guid eventId, EventEditModel edit)
+    {
+        eventEditDiscipline[eventId] = editing is not null && edit.PlayerId is { } playerId
+            ? await DisciplineQueryService.GetPlayerDisciplineForMatchAsync(editing.MatchId, playerId)
+            : null;
     }
 
     private async Task LoadEventPlayersAsync(Guid teamId)
@@ -695,6 +716,8 @@ else
                 x.ShirtNumber,
                 x.ShirtNumber != null ? $"#{x.ShirtNumber} {x.DisplayName}" : x.DisplayName))
             .ToListAsync());
+
+        eventPlayers.RemoveAll(x => unavailableEventPlayerIds.Contains(x.Id));
     }
 
     private async Task LoadAllMatchEventPlayersAsync(Guid homeTeamId, Guid awayTeamId)
@@ -802,6 +825,8 @@ else
     {
         selectedEvents.Clear();
         eventEdits.Clear();
+        eventEditDiscipline.Clear();
+        unavailableEventPlayerIds.Clear();
         selectedEvents.AddRange(await Db.MatchEvents
             .AsNoTracking()
             .Include(x => x.Team)!.ThenInclude(x => x!.Club)
@@ -831,6 +856,11 @@ else
                 PlayerName = item.PlayerName,
                 Notes = item.Notes ?? string.Empty
             };
+        }
+
+        foreach (var playerId in ExpelledPlayerIdsFromEvents(selectedEvents))
+        {
+            unavailableEventPlayerIds.Add(playerId);
         }
     }
 
@@ -866,6 +896,16 @@ else
             return;
         }
 
+        errorMessage = await ValidatePlayerAvailabilityForEventAsync(
+            editing.MatchId,
+            eventForm.PlayerId,
+            eventForm.EventType,
+            null);
+        if (errorMessage is not null)
+        {
+            return;
+        }
+
         isSavingEvent = true;
         try
         {
@@ -896,6 +936,7 @@ else
                 eventForm.PlayerId = null;
                 eventForm.Notes = string.Empty;
                 eventForm.Minute = 0;
+                selectedEventPlayerDiscipline = null;
                 await LoadPendingProposalsAsync();
                 successMessage = "Propuesta enviada para revision.";
                 return;
@@ -922,6 +963,7 @@ else
             eventForm.PlayerId = null;
             eventForm.Notes = string.Empty;
             eventForm.Minute = 0;
+            selectedEventPlayerDiscipline = null;
             await LoadMatchesAsync();
             await SelectMatchAsync(selectedMatchId);
             await NotifyMatchDataChangedAsync();
@@ -1019,7 +1061,17 @@ else
             return;
         }
 
-        errorMessage = Validate(edit, editing, EventPlayersForTeam(edit.TeamId));
+        errorMessage = Validate(edit, editing, EventPlayersForTeam(edit.TeamId, edit.PlayerId));
+        if (errorMessage is not null)
+        {
+            return;
+        }
+
+        errorMessage = await ValidatePlayerAvailabilityForEventAsync(
+            editing.MatchId,
+            edit.PlayerId,
+            edit.EventType,
+            eventId);
         if (errorMessage is not null)
         {
             return;
@@ -1383,6 +1435,59 @@ else
         return null;
     }
 
+    private async Task<string?> ValidatePlayerAvailabilityForEventAsync(
+        Guid matchId,
+        Guid? playerId,
+        MatchEventType eventType,
+        Guid? excludedEventId)
+    {
+        if (playerId is null)
+        {
+            return null;
+        }
+
+        var cardEvents = await Db.MatchEvents
+            .AsNoTracking()
+            .Where(x =>
+                x.MatchId == matchId &&
+                x.PlayerId == playerId &&
+                (excludedEventId == null || x.Id != excludedEventId.Value) &&
+                (x.Type == MatchEventType.YellowCard || x.Type == MatchEventType.RedCard))
+            .Select(x => x.Type)
+            .ToListAsync();
+
+        var hasRedCard = cardEvents.Any(x => x == MatchEventType.RedCard);
+        var yellowCards = cardEvents.Count(x => x == MatchEventType.YellowCard);
+
+        if (hasRedCard)
+        {
+            return "El jugador ya fue expulsado en este partido.";
+        }
+
+        if (yellowCards >= 2)
+        {
+            return "El jugador ya tiene doble amarilla en este partido.";
+        }
+
+        if (eventType == MatchEventType.YellowCard && yellowCards >= 2)
+        {
+            return "No se puede cargar una tercera amarilla al mismo jugador.";
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<Guid> ExpelledPlayerIdsFromEvents(IEnumerable<AdminMatchEventRow> events)
+    {
+        return events
+            .Where(x => x.PlayerId is not null && (x.EventType == MatchEventType.YellowCard || x.EventType == MatchEventType.RedCard))
+            .GroupBy(x => x.PlayerId!.Value)
+            .Where(group =>
+                group.Any(x => x.EventType == MatchEventType.RedCard) ||
+                group.Count(x => x.EventType == MatchEventType.YellowCard) >= 2)
+            .Select(group => group.Key);
+    }
+
     private static string ScoreText(int? homeScore, int? awayScore) =>
         homeScore is null || awayScore is null ? "vs" : $"{homeScore}-{awayScore}";
 
@@ -1397,6 +1502,28 @@ else
         MatchEventType.RedCard => "Tarjeta roja",
         _ => eventType.ToString()
     };
+
+    private string EventLabel(AdminMatchEventRow item) => IsSecondYellowCard(item)
+        ? "Doble amarilla"
+        : EventLabel(item.EventType);
+
+    private bool IsSecondYellowCard(AdminMatchEventRow item)
+    {
+        if (item.EventType != MatchEventType.YellowCard || item.PlayerId is null)
+        {
+            return false;
+        }
+
+        var itemIndex = selectedEvents.FindIndex(x => x.Id == item.Id);
+        if (itemIndex < 0)
+        {
+            return false;
+        }
+
+        return selectedEvents
+            .Take(itemIndex + 1)
+            .Count(x => x.PlayerId == item.PlayerId && x.EventType == MatchEventType.YellowCard) == 2;
+    }
 
     private static string EventPeriod(int minute) => minute switch
     {
