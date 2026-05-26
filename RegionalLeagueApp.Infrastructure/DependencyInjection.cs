@@ -36,6 +36,11 @@ public static class DependencyInjection
             options.UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
 
+        services.AddDbContextFactory<ApplicationDbContext>(options =>
+            options.UseNpgsql(connectionString, npgsql =>
+                npgsql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)),
+            ServiceLifetime.Scoped);
+
         services.AddIdentityCore<ApplicationIdentityUser>(options =>
             {
                 options.User.RequireUniqueEmail = true;
@@ -53,6 +58,7 @@ public static class DependencyInjection
         services.AddScoped<IMatchAdministrationPermissionService, EfMatchAdministrationPermissionService>();
         services.AddScoped<IMatchScoreRecalculationService, EfMatchScoreRecalculationService>();
         services.AddScoped<IFixtureCsvImportService, EfFixtureCsvImportService>();
+        services.AddScoped<IFixtureGeneratorService, FixtureGeneratorService>();
         services.AddScoped<IPlayerCsvImportService, EfPlayerCsvImportService>();
         services.AddScoped<IDisciplineQueryService, EfDisciplineQueryService>();
         services.AddScoped<IStandingsQueryService, EfStandingsQueryService>();

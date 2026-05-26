@@ -97,6 +97,11 @@ public sealed class DevelopmentDataSeeder(
 
     private async Task SeedLeagueDataAsync(CancellationToken cancellationToken)
     {
+        if (await db.Leagues.AnyAsync(cancellationToken))
+        {
+            return;
+        }
+
         const string leagueName = "Liga Regional Norte";
         const string leagueRegion = "Norte";
         const string leagueCountry = "Argentina";

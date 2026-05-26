@@ -1,0 +1,61 @@
+@using RegionalLeagueApp.Application.Fixtures
+
+<div class="admin-csv-import">
+    <div class="admin-fixture-existing__title">
+        <div>
+            <h3>Importar fixture CSV</h3>
+            <span>Formato: Round,Date,Time,HomeTeam,AwayTeam</span>
+        </div>
+    </div>
+
+    <textarea class="form-control admin-csv-import__input" value="@CsvInput" @oninput="e => CsvInputChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty)" placeholder="Round,Date,Time,HomeTeam,AwayTeam&#10;1,2026-08-02,14:00,Olimpia,Rivadavia"></textarea>
+    <div class="admin-csv-import__actions">
+        <button type="button" class="leagues-button leagues-button--muted" disabled="@IsSaving" @onclick="Preview">Previsualizar</button>
+        @if (PreviewResult is not null && PreviewResult.ValidCount > 0)
+        {
+            <button type="button" class="leagues-button" disabled="@IsSaving" @onclick="Confirm">Confirmar importacion (@PreviewResult.ValidCount)</button>
+        }
+    </div>
+
+    @if (PreviewResult is not null)
+    {
+        <div class="table-panel admin-csv-preview">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Fila</th>
+                        <th>Jornada</th>
+                        <th>Fecha/hora</th>
+                        <th>Local</th>
+                        <th>Visitante</th>
+                        <th>Estado</th>
+                        <th>Mensaje</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in PreviewResult.Rows)
+                    {
+                        <tr class="admin-csv-preview--@row.Status.ToString().ToLowerInvariant()">
+                            <td>@row.RowNumber</td>
+                            <td>@row.Round</td>
+                            <td>@row.StartsAt</td>
+                            <td>@row.HomeTeam</td>
+                            <td>@row.AwayTeam</td>
+                            <td>@row.Status</td>
+                            <td>@row.Message</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string CsvInput { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> CsvInputChanged { get; set; }
+    [Parameter] public FixtureCsvPreviewResult? PreviewResult { get; set; }
+    [Parameter] public bool IsSaving { get; set; }
+    [Parameter] public EventCallback Preview { get; set; }
+    [Parameter] public EventCallback Confirm { get; set; }
+}

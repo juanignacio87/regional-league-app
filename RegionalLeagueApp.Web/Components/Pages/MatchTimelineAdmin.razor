@@ -1,0 +1,113 @@
+@using RegionalLeagueApp.Application.Discipline
+
+<article class="panel admin-events">
+    <div class="panel-title-row">
+        <PanelHeader Eyebrow="Eventos" Title="Linea de tiempo" Meta="@($"{Events.Count} eventos")" />
+    </div>
+
+    @if (Events.Count == 0)
+    {
+        <EmptyState Text="No hay eventos cargados para este partido." />
+    }
+    else
+    {
+        <div class="admin-event-list">
+            @foreach (var group in EventGroups)
+            {
+                <section class="admin-event-period">
+                    <h3>@group.Key</h3>
+                    <div class="admin-event-table-head" aria-hidden="true">
+                        <span>Min</span>
+                        <span>Evento</span>
+                        <span>Equipo</span>
+                        <span>Jugador</span>
+                        <span>Nota</span>
+                        <span>Acciones</span>
+                    </div>
+                    @foreach (var item in group)
+                    {
+                        var edit = GetEventEdit(item);
+                        <MatchEventRow
+                            Event="@item"
+                            Match="@Match"
+                            EditingEventId="@EditingEventId"
+                            CanModerate="@CanModerate"
+                            IsSavingEvent="@IsSavingEvent"
+                            EventTypes="@EventTypes"
+                            EventPlayers="@EventPlayersForTeam(edit.TeamId, edit.PlayerId)"
+                            EditDiscipline="@EditDiscipline(item.Id)"
+                            GetEventEdit="@GetEventEdit"
+                            EventLabel="@EventLabel"
+                            EventTypeLabel="@EventTypeLabel"
+                            IsSecondYellow="@IsSecondYellow"
+                            BeginEdit="@BeginEdit"
+                            Delete="@Delete"
+                            SaveEdit="@SaveEdit"
+                            CancelEdit="@CancelEdit"
+                            EditTeamChanged="@EditTeamChanged"
+                            EditPlayerChanged="@(args => EditPlayerChanged.InvokeAsync(new EventPlayerChangedArgs(item.Id, edit, args)))" />
+                    }
+                </section>
+            }
+        </div>
+    }
+
+    <EditForm Model="CreateModel" OnValidSubmit="CreateEvent" class="admin-form admin-event-form">
+        <DataAnnotationsValidator />
+
+        <MatchEventEditor
+            CreateModel="@CreateModel"
+            Players="@CreatePlayers"
+            EventTypes="@EventTypes"
+            EventLabel="@EventTypeLabel"
+            HomeTeamId="@Match.HomeTeamId"
+            HomeTeamName="@Match.HomeTeamName"
+            AwayTeamId="@Match.AwayTeamId"
+            AwayTeamName="@Match.AwayTeamName"
+            SelectedPlayerDiscipline="@SelectedPlayerDiscipline"
+            CreateTeamChanged="@CreateTeamChanged"
+            CreatePlayerChanged="@CreatePlayerChanged" />
+
+        <button class="btn btn-primary" type="submit" disabled="@IsSavingEvent">
+            @(IsSavingEvent ? "Agregando..." : CanModerate ? "Agregar evento" : "Proponer evento")
+        </button>
+    </EditForm>
+</article>
+
+@code {
+    [Parameter, EditorRequired] public AdminMatchEditModel Match { get; set; } = default!;
+    [Parameter, EditorRequired] public EventCreateModel CreateModel { get; set; } = default!;
+    [Parameter] public IReadOnlyList<AdminMatchEventRow> Events { get; set; } = [];
+    [Parameter] public IReadOnlyList<EventPlayerOption> CreatePlayers { get; set; } = [];
+    [Parameter] public IReadOnlyList<MatchEventType> EventTypes { get; set; } = [];
+    [Parameter] public DisciplineRowDto? SelectedPlayerDiscipline { get; set; }
+    [Parameter] public Guid? EditingEventId { get; set; }
+    [Parameter] public bool CanModerate { get; set; }
+    [Parameter] public bool IsSavingEvent { get; set; }
+    [Parameter] public Func<AdminMatchEventRow, EventEditModel> GetEventEdit { get; set; } = _ => new EventEditModel();
+    [Parameter] public Func<Guid, Guid?, IReadOnlyList<EventPlayerOption>> EventPlayersForTeam { get; set; } = (_, _) => [];
+    [Parameter] public Func<Guid, DisciplineRowDto?> EditDiscipline { get; set; } = _ => null;
+    [Parameter] public Func<AdminMatchEventRow, string> EventLabel { get; set; } = item => item.EventType.ToString();
+    [Parameter] public Func<MatchEventType, string> EventTypeLabel { get; set; } = eventType => eventType.ToString();
+    [Parameter] public Func<AdminMatchEventRow, bool> IsSecondYellow { get; set; } = _ => false;
+    [Parameter] public EventCallback CreateEvent { get; set; }
+    [Parameter] public EventCallback CreateTeamChanged { get; set; }
+    [Parameter] public EventCallback CreatePlayerChanged { get; set; }
+    [Parameter] public EventCallback<AdminMatchEventRow> BeginEdit { get; set; }
+    [Parameter] public EventCallback<Guid> Delete { get; set; }
+    [Parameter] public EventCallback<Guid> SaveEdit { get; set; }
+    [Parameter] public EventCallback CancelEdit { get; set; }
+    [Parameter] public EventCallback<EventEditModel> EditTeamChanged { get; set; }
+    [Parameter] public EventCallback<EventPlayerChangedArgs> EditPlayerChanged { get; set; }
+
+    private IEnumerable<IGrouping<string, AdminMatchEventRow>> EventGroups => Events
+        .GroupBy(item => EventPeriod(item.Minute))
+        .OrderBy(group => group.Min(item => item.Minute));
+
+    private static string EventPeriod(int minute) => minute switch
+    {
+        <= 45 => "1T",
+        <= 90 => "2T",
+        _ => "Extra"
+    };
+}

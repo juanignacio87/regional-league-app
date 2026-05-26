@@ -9,14 +9,18 @@
 
 <PageTitle>Tabla</PageTitle>
 
+<PageBreadcrumb BackHref="@BreadcrumbBackHref" ParentHref="@BreadcrumbParentHref" ParentLabel="@BreadcrumbParentLabel" CurrentLabel="@BreadcrumbCurrentLabel" />
+
 <div class="page-heading">
     <p class="eyebrow">Standings</p>
     <h1>@PageTitleText</h1>
 </div>
 
+<LeagueCompetitionFilter Path="/standings" LeagueId="@LeagueId" CompetitionId="@CompetitionId" />
+
 @if (standings.Count == 0)
 {
-    <EmptyState Text="No hay tabla disponible." />
+    <EmptyState Text="@EmptyText" />
 }
 else
 {
@@ -79,12 +83,28 @@ else
     private IReadOnlyList<StandingRowDto> standings = [];
     private Func<Task>? reloadHandler;
     private string? leagueName;
+    private string? competitionName;
 
     [SupplyParameterFromQuery] public Guid? LeagueId { get; set; }
+    [SupplyParameterFromQuery] public Guid? CompetitionId { get; set; }
 
     private string PageTitleText => string.IsNullOrWhiteSpace(leagueName)
         ? "Tabla de posiciones"
         : $"Tabla de posiciones - {leagueName}";
+
+    private string EmptyText => CompetitionId is not null
+        ? "No hay tabla disponible para esta competencia."
+        : "No hay tabla disponible.";
+
+    private string BreadcrumbBackHref => LeagueId is null ? "/" : $"/leagues/{LeagueId}";
+
+    private string BreadcrumbParentHref => LeagueId is null ? "/" : $"/leagues/{LeagueId}";
+
+    private string BreadcrumbParentLabel => LeagueId is null ? "Inicio" : leagueName ?? "Liga";
+
+    private string BreadcrumbCurrentLabel => string.IsNullOrWhiteSpace(competitionName)
+        ? "Tabla"
+        : $"{competitionName} / Tabla";
 
     protected override async Task OnParametersSetAsync()
     {
@@ -125,6 +145,17 @@ else
                 .Select(x => x.Name)
                 .FirstOrDefaultAsync();
 
-        standings = await StandingsQueryService.GetStandingsAsync(LeagueId);
+        competitionName = CompetitionId is null
+            ? null
+            : await Db.Competitions
+                .AsNoTracking()
+                .Where(x => x.Id == CompetitionId && x.IsActive)
+                .Select(x => x.Name)
+                .FirstOrDefaultAsync();
+
+        var loadedStandings = await StandingsQueryService.GetStandingsAsync(LeagueId);
+        standings = CompetitionId is null
+            ? loadedStandings
+            : loadedStandings.Where(x => x.CompetitionId == CompetitionId).ToList();
     }
 }

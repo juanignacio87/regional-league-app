@@ -1,0 +1,71 @@
+<section class="league-ops-card admin-league-panel">
+    <PanelHeader Eyebrow="Competencias -> Equipos" Title="Equipos participantes" Meta="@($"{Participants.Count} participante(s)")" />
+    <div class="admin-compact-list">
+        @if (Participants.Count == 0)
+        {
+            <span>No hay equipos asociados.</span>
+        }
+        else
+        {
+            @foreach (var participant in Participants.Take(5))
+            {
+                <span>@participant.ClubName - @participant.TeamName</span>
+            }
+        }
+    </div>
+    <div class="league-ops-form">
+        <label>
+            Competencia
+            <select class="form-control" value="@NullableGuidValue(NewTeamCompetitionId)" @onchange="OnCompetitionChanged">
+                <option value="">Seleccionar</option>
+                @foreach (var competition in CompetitionOptions)
+                {
+                    <option value="@competition.Id">@competition.Label</option>
+                }
+            </select>
+        </label>
+        <label>
+            Club
+            <select class="form-control" value="@NullableGuidValue(NewTeamClubId)" @onchange="OnClubChanged">
+                <option value="">Seleccionar</option>
+                @foreach (var club in ClubOptions)
+                {
+                    <option value="@club.Id">@club.Name</option>
+                }
+            </select>
+        </label>
+        <label>Nombre equipo <input class="form-control" value="@NewTeamName" @oninput="e => NewTeamNameChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty)" maxlength="150" /></label>
+        <label>Categoria <input class="form-control" value="@NewTeamCategory" @oninput="e => NewTeamCategoryChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty)" maxlength="60" /></label>
+        <button class="leagues-button" type="button" disabled="@IsSaving" @onclick="AddTeam">Agregar</button>
+    </div>
+</section>
+
+@code {
+    [Parameter] public IReadOnlyList<ParticipantItem> Participants { get; set; } = [];
+    [Parameter] public IReadOnlyList<CompetitionOption> CompetitionOptions { get; set; } = [];
+    [Parameter] public IReadOnlyList<ClubOption> ClubOptions { get; set; } = [];
+    [Parameter] public bool IsSaving { get; set; }
+    [Parameter] public Guid? NewTeamCompetitionId { get; set; }
+    [Parameter] public EventCallback<Guid?> NewTeamCompetitionIdChanged { get; set; }
+    [Parameter] public Guid? NewTeamClubId { get; set; }
+    [Parameter] public EventCallback<Guid?> NewTeamClubIdChanged { get; set; }
+    [Parameter] public string NewTeamName { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> NewTeamNameChanged { get; set; }
+    [Parameter] public string NewTeamCategory { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> NewTeamCategoryChanged { get; set; }
+    [Parameter] public EventCallback AddTeam { get; set; }
+
+    private async Task OnCompetitionChanged(ChangeEventArgs args)
+    {
+        await NewTeamCompetitionIdChanged.InvokeAsync(ParseNullableGuid(args.Value?.ToString()));
+    }
+
+    private async Task OnClubChanged(ChangeEventArgs args)
+    {
+        await NewTeamClubIdChanged.InvokeAsync(ParseNullableGuid(args.Value?.ToString()));
+    }
+
+    private static string NullableGuidValue(Guid? value) => value?.ToString() ?? string.Empty;
+
+    private static Guid? ParseNullableGuid(string? value) => Guid.TryParse(value, out var id) ? id : null;
+}

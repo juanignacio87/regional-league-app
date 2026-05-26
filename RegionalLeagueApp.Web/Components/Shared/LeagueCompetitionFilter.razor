@@ -1,0 +1,103 @@
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbFactory
+@inject NavigationManager Navigation
+
+<section class="panel fixture-filter-panel">
+    <div class="fixture-filter-grid">
+        <label>
+            Liga
+            <select class="form-control" value="@LeagueValue" @onchange="OnLeagueChanged">
+                <option value="">Todas</option>
+                @foreach (var league in leagues)
+                {
+                    <option value="@league.Id">@league.Name</option>
+                }
+            </select>
+        </label>
+        <label>
+            Competencia
+            <select class="form-control" value="@CompetitionValue" @onchange="OnCompetitionChanged" disabled="@(LeagueId is null)">
+                <option value="">Todas</option>
+                @foreach (var competition in competitions)
+                {
+                    <option value="@competition.Id">@competition.Name</option>
+                }
+            </select>
+        </label>
+    </div>
+    <nav class="fixture-filter-links" aria-label="Navegacion contextual deportiva">
+        <a href="@ContextHref("/fixture")">Fixture</a>
+        <a href="@ContextHref("/results")">Resultados</a>
+        <a href="@ContextHref("/standings")">Tabla</a>
+        <a href="@ContextHref("/clubs")">Clubes</a>
+        <a href="@ContextHref("/scorers")">Goleadores</a>
+        <a href="@ContextHref("/discipline")">Disciplina</a>
+    </nav>
+</section>
+
+@code {
+    [Parameter] public string Path { get; set; } = "/";
+    [Parameter] public Guid? LeagueId { get; set; }
+    [Parameter] public Guid? CompetitionId { get; set; }
+
+    private List<FilterOption> leagues = [];
+    private List<FilterOption> competitions = [];
+    private string LeagueValue => LeagueId?.ToString() ?? string.Empty;
+    private string CompetitionValue => CompetitionId?.ToString() ?? string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        leagues = await db.Leagues
+            .AsNoTracking()
+            .Where(x => x.IsActive)
+            .OrderBy(x => x.Name)
+            .Select(x => new FilterOption(x.Id, x.Name))
+            .ToListAsync();
+
+        competitions = LeagueId is null
+            ? []
+            : await db.Competitions
+                .AsNoTracking()
+                .Where(x => x.IsActive && x.Season!.LeagueId == LeagueId)
+                .OrderBy(x => x.Season!.Name)
+                .ThenBy(x => x.Name)
+                .Select(x => new FilterOption(x.Id, x.Name))
+                .ToListAsync();
+    }
+
+    private void OnLeagueChanged(ChangeEventArgs args)
+    {
+        var value = args.Value?.ToString();
+        Navigation.NavigateTo(string.IsNullOrWhiteSpace(value)
+            ? Path
+            : $"{Path}?leagueId={value}");
+    }
+
+    private void OnCompetitionChanged(ChangeEventArgs args)
+    {
+        var value = args.Value?.ToString();
+        if (LeagueId is null || string.IsNullOrWhiteSpace(value))
+        {
+            Navigation.NavigateTo(LeagueId is null ? Path : $"{Path}?leagueId={LeagueId}");
+            return;
+        }
+
+        Navigation.NavigateTo($"{Path}?leagueId={LeagueId}&competitionId={value}");
+    }
+
+    private string ContextHref(string path)
+    {
+        if (LeagueId is null)
+        {
+            return path;
+        }
+
+        return CompetitionId is null
+            ? $"{path}?leagueId={LeagueId}"
+            : $"{path}?leagueId={LeagueId}&competitionId={CompetitionId}";
+    }
+
+    private sealed record FilterOption(Guid Id, string Name);
+}

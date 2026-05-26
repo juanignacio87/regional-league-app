@@ -7,14 +7,18 @@
 
 <PageTitle>Goleadores</PageTitle>
 
+<PageBreadcrumb BackHref="@BreadcrumbBackHref" ParentHref="@BreadcrumbParentHref" ParentLabel="@BreadcrumbParentLabel" CurrentLabel="@BreadcrumbCurrentLabel" />
+
 <div class="page-heading">
     <p class="eyebrow">Goleadores</p>
-    <h1>Ranking de goleadores</h1>
+    <h1>@PageTitleText</h1>
 </div>
+
+<LeagueCompetitionFilter Path="/scorers" LeagueId="@LeagueId" CompetitionId="@CompetitionId" />
 
 @if (scorers.Count == 0)
 {
-    <EmptyState Text="Todavia no hay goles asociados a jugadores." />
+    <EmptyState Text="@EmptyText" />
 }
 else
 {
@@ -24,6 +28,7 @@ else
                 <tr>
                     <th>Jugador</th>
                     <th>Equipo</th>
+                    <th>Competencia</th>
                     <th>Goles</th>
                 </tr>
             </thead>
@@ -42,6 +47,7 @@ else
                             }
                         </td>
                         <td>@scorer.TeamName</td>
+                        <td>@scorer.CompetitionName</td>
                         <td><strong>@scorer.Goals</strong></td>
                     </tr>
                 }
@@ -53,8 +59,31 @@ else
 @code {
     private List<ScorerRow> scorers = [];
     private Func<Task>? reloadHandler;
+    private string? leagueName;
+    private string? competitionName;
 
-    protected override async Task OnInitializedAsync()
+    [SupplyParameterFromQuery] public Guid? LeagueId { get; set; }
+    [SupplyParameterFromQuery] public Guid? CompetitionId { get; set; }
+
+    private string PageTitleText => string.IsNullOrWhiteSpace(leagueName)
+        ? "Ranking de goleadores"
+        : $"Goleadores - {leagueName}";
+
+    private string EmptyText => CompetitionId is not null
+        ? "Todavia no hay goles asociados a jugadores en esta competencia."
+        : "Todavia no hay goles asociados a jugadores.";
+
+    private string BreadcrumbBackHref => LeagueId is null ? "/" : $"/leagues/{LeagueId}";
+
+    private string BreadcrumbParentHref => LeagueId is null ? "/" : $"/leagues/{LeagueId}";
+
+    private string BreadcrumbParentLabel => LeagueId is null ? "Inicio" : leagueName ?? "Liga";
+
+    private string BreadcrumbCurrentLabel => string.IsNullOrWhiteSpace(competitionName)
+        ? "Goleadores"
+        : $"{competitionName} / Goleadores";
+
+    protected override async Task OnParametersSetAsync()
     {
         await LoadAsync();
     }
@@ -85,6 +114,22 @@ else
 
     private async Task LoadAsync()
     {
+        leagueName = LeagueId is null
+            ? null
+            : await Db.Leagues
+                .AsNoTracking()
+                .Where(x => x.Id == LeagueId)
+                .Select(x => x.Name)
+                .FirstOrDefaultAsync();
+
+        competitionName = CompetitionId is null
+            ? null
+            : await Db.Competitions
+                .AsNoTracking()
+                .Where(x => x.Id == CompetitionId && x.IsActive)
+                .Select(x => x.Name)
+                .FirstOrDefaultAsync();
+
         var goalEvents = await Db.MatchEvents
             .AsNoTracking()
             .Where(x =>
@@ -92,6 +137,10 @@ else
                 (x.PlayerId != null || x.PlayerName != string.Empty) &&
                 x.Team!.IsActive &&
                 x.Team.Club!.IsActive &&
+                x.Match!.Competition!.IsActive &&
+                x.Match.Competition.Season!.League!.IsActive &&
+                (LeagueId == null || x.Match.Competition.Season.LeagueId == LeagueId) &&
+                (CompetitionId == null || x.Match.CompetitionId == CompetitionId) &&
                 (x.Player == null || x.Player.IsActive))
             .Select(x => new
             {
@@ -101,7 +150,9 @@ else
                     : x.Player != null
                         ? x.Player.DisplayName
                         : string.Empty,
-                TeamName = x.Team != null ? x.Team.Club!.Name : "Sin equipo"
+                TeamName = x.Team != null ? x.Team.Club!.Name : "Sin equipo",
+                CompetitionId = x.Match!.CompetitionId,
+                CompetitionName = x.Match.Competition!.Name
             })
             .ToListAsync();
 
@@ -110,17 +161,20 @@ else
             .GroupBy(x => new
             {
                 PlayerKey = x.PlayerId?.ToString() ?? x.PlayerName.Trim().ToUpperInvariant(),
-                x.TeamName
+                x.TeamName,
+                x.CompetitionId,
+                x.CompetitionName
             })
             .Select(group => new ScorerRow(
                 group.First().PlayerId,
                 group.OrderByDescending(x => x.PlayerId != null).First().PlayerName,
                 group.Key.TeamName,
+                group.Key.CompetitionName,
                 group.Count()))
             .OrderByDescending(x => x.Goals)
             .ThenBy(x => x.PlayerName)
             .ToList();
     }
 
-    private sealed record ScorerRow(Guid? PlayerId, string PlayerName, string TeamName, int Goals);
+    private sealed record ScorerRow(Guid? PlayerId, string PlayerName, string TeamName, string CompetitionName, int Goals);
 }

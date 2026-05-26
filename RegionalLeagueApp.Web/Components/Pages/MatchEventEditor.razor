@@ -1,0 +1,121 @@
+@using RegionalLeagueApp.Application.Discipline
+
+@if (CreateModel is not null)
+{
+    <div class="admin-event-editor-grid">
+        <label>
+            Evento
+            <InputSelect class="form-control" @bind-Value="CreateModel.EventType">
+                @foreach (var eventType in EventTypes)
+                {
+                    <option value="@eventType">@EventLabel(eventType)</option>
+                }
+            </InputSelect>
+        </label>
+        <label>
+            Equipo
+            <InputSelect class="form-control" @bind-Value="CreateModel.TeamId" @bind-Value:after="OnCreateTeamChanged">
+                <option value="@HomeTeamId">@HomeTeamName</option>
+                <option value="@AwayTeamId">@AwayTeamName</option>
+            </InputSelect>
+        </label>
+        <label>
+            Jugador
+            @if (Players.Count == 0)
+            {
+                <InputText class="form-control" @bind-Value="CreateModel.PlayerName" placeholder="Nombre del jugador" />
+                <ValidationMessage For="@(() => CreateModel!.PlayerName)" />
+            }
+            else
+            {
+                <InputSelect class="form-control" @bind-Value="CreateModel.PlayerId" @bind-Value:after="OnCreatePlayerChanged">
+                    <option value="">Seleccionar jugador</option>
+                    @foreach (var player in Players)
+                    {
+                        <option value="@player.Id">@player.Label</option>
+                    }
+                </InputSelect>
+                <ValidationMessage For="@(() => CreateModel!.PlayerId)" />
+                @if (SelectedPlayerDiscipline?.Status == DisciplineStatus.Suspended)
+                {
+                    <small class="admin-discipline-warning">Suspendido por acumulacion disciplinaria en esta competencia.</small>
+                }
+            }
+        </label>
+        <label>
+            Minuto
+            <InputNumber class="form-control" min="0" max="130" @bind-Value="CreateModel.Minute" />
+            <ValidationMessage For="@(() => CreateModel!.Minute)" />
+        </label>
+        <label>
+            Nota
+            <InputText class="form-control" @bind-Value="CreateModel.Notes" />
+        </label>
+    </div>
+}
+else if (EditModel is not null)
+{
+    <div class="admin-event-editor-grid">
+        <label>Minuto <InputNumber class="form-control" min="0" max="130" @bind-Value="EditModel.Minute" /></label>
+        <label>
+            Evento
+            <InputSelect class="form-control" @bind-Value="EditModel.EventType">
+                @foreach (var eventType in EventTypes)
+                {
+                    <option value="@eventType">@EventLabel(eventType)</option>
+                }
+            </InputSelect>
+        </label>
+        <label>
+            Equipo
+            <InputSelect class="form-control" @bind-Value="EditModel.TeamId" @bind-Value:after="() => EditTeamChanged.InvokeAsync(EditModel)">
+                <option value="@HomeTeamId">@HomeTeamName</option>
+                <option value="@AwayTeamId">@AwayTeamName</option>
+            </InputSelect>
+        </label>
+        <label>
+            Jugador
+            @if (Players.Count == 0)
+            {
+                <InputText class="form-control" @bind-Value="EditModel.PlayerName" placeholder="Nombre del jugador" />
+            }
+            else
+            {
+                <select class="form-control" value="@EditModel.PlayerId" @onchange="EditPlayerChanged">
+                    <option value="">Seleccionar jugador</option>
+                    @foreach (var player in Players)
+                    {
+                        <option value="@player.Id">@player.Label</option>
+                    }
+                </select>
+                @if (IsEditPlayerSuspended)
+                {
+                    <small class="admin-discipline-warning">Suspendido por acumulacion disciplinaria en esta competencia.</small>
+                }
+            }
+        </label>
+        <label>Nota <InputText class="form-control" @bind-Value="EditModel.Notes" /></label>
+    </div>
+}
+
+@code {
+    [Parameter] public EventCreateModel? CreateModel { get; set; }
+    [Parameter] public EventEditModel? EditModel { get; set; }
+    [Parameter] public IReadOnlyList<EventPlayerOption> Players { get; set; } = [];
+    [Parameter] public IReadOnlyList<MatchEventType> EventTypes { get; set; } = [];
+    [Parameter] public Func<MatchEventType, string> EventLabel { get; set; } = eventType => eventType.ToString();
+    [Parameter] public Guid HomeTeamId { get; set; }
+    [Parameter] public string HomeTeamName { get; set; } = string.Empty;
+    [Parameter] public Guid AwayTeamId { get; set; }
+    [Parameter] public string AwayTeamName { get; set; } = string.Empty;
+    [Parameter] public DisciplineRowDto? SelectedPlayerDiscipline { get; set; }
+    [Parameter] public bool IsEditPlayerSuspended { get; set; }
+    [Parameter] public EventCallback CreateTeamChanged { get; set; }
+    [Parameter] public EventCallback CreatePlayerChanged { get; set; }
+    [Parameter] public EventCallback<EventEditModel> EditTeamChanged { get; set; }
+    [Parameter] public EventCallback<ChangeEventArgs> EditPlayerChanged { get; set; }
+
+    private Task OnCreateTeamChanged() => CreateTeamChanged.InvokeAsync();
+
+    private Task OnCreatePlayerChanged() => CreatePlayerChanged.InvokeAsync();
+}

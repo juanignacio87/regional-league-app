@@ -324,6 +324,12 @@ p {
     color: #9f1239;
 }
 
+.ui-form-message--warning {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    color: #92400e;
+}
+
 .ui-form-message--neutral {
     background: #f8fbfa;
     border: 1px solid #dfe8e5;
@@ -755,6 +761,41 @@ p {
 .match-list {
     display: grid;
     gap: .6rem;
+}
+
+.fixture-filter-panel {
+    margin-bottom: 1rem;
+}
+
+.fixture-filter-grid {
+    display: grid;
+    gap: .75rem;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.fixture-filter-panel label {
+    color: #40514d;
+    display: grid;
+    font-size: .86rem;
+    font-weight: 800;
+    gap: .35rem;
+}
+
+.fixture-filter-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .45rem;
+    margin-top: .75rem;
+}
+
+.fixture-filter-links a {
+    background: #e6f3ef;
+    border-radius: 999px;
+    color: #0f4f43;
+    font-size: .82rem;
+    font-weight: 900;
+    padding: .3rem .55rem;
+    text-decoration: none;
 }
 
 .match-card {
@@ -1706,6 +1747,32 @@ p {
     gap: .5rem;
 }
 
+.admin-fixture-generator-form {
+    margin-top: .65rem;
+}
+
+.admin-fixture-generator-summary {
+    align-items: center;
+    background: #f8fbfa;
+    border: 1px solid #edf2f0;
+    border-radius: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin-top: .7rem;
+    padding: .6rem .75rem;
+}
+
+.admin-fixture-generator-summary strong,
+.admin-fixture-generator-summary span {
+    background: #e6f3ef;
+    border-radius: 999px;
+    color: #0f4f43;
+    font-size: .84rem;
+    font-weight: 900;
+    padding: .28rem .55rem;
+}
+
 .admin-csv-preview {
     overflow-x: auto;
 }
@@ -1775,20 +1842,20 @@ p {
 }
 
 .leagues-col-name {
-    width: 30%;
+    width: 28%;
 }
 
 .leagues-col-region,
 .leagues-col-country {
-    width: 18%;
+    width: 16%;
 }
 
 .leagues-col-small {
-    width: 6%;
+    width: 8%;
 }
 
 .leagues-col-state {
-    width: 8%;
+    width: 10%;
 }
 
 .leagues-col-actions {
@@ -1797,7 +1864,27 @@ p {
 
 .leagues-admin-table th,
 .leagues-admin-table td {
+    line-height: 1.2;
     white-space: normal;
+}
+
+.leagues-admin-table th {
+    overflow-wrap: anywhere;
+    vertical-align: bottom;
+}
+
+.leagues-admin-table th:nth-child(4),
+.leagues-admin-table th:nth-child(5),
+.leagues-admin-table td:nth-child(4),
+.leagues-admin-table td:nth-child(5) {
+    font-size: .78rem;
+    text-align: center;
+}
+
+.leagues-admin-table th:nth-child(6),
+.leagues-admin-table td:nth-child(6) {
+    padding-left: .8rem;
+    padding-right: .8rem;
 }
 
 .leagues-admin-table td:nth-child(1) .form-control,

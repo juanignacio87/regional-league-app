@@ -1,0 +1,37 @@
+<section class="league-ops-card admin-league-panel">
+    <PanelHeader Eyebrow="Liga -> Temporadas" Title="Temporadas" Meta="@($"{Seasons.Count} cargada(s)")" />
+    <div class="admin-compact-list">
+        @if (Seasons.Count == 0)
+        {
+            <span>No hay temporadas cargadas.</span>
+        }
+        else
+        {
+            @foreach (var season in Seasons.Take(4))
+            {
+                <span>@season.Name</span>
+            }
+        }
+    </div>
+    <div class="league-ops-form">
+        <label>Nombre <input class="form-control" value="@NewSeasonName" @oninput="e => NewSeasonNameChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty)" maxlength="120" /></label>
+        <label>Inicio <input class="form-control" type="date" value="@NewSeasonStartsOn" @oninput="e => NewSeasonStartsOnChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty)" /></label>
+        <label>Fin <input class="form-control" type="date" value="@NewSeasonEndsOn" @oninput="e => NewSeasonEndsOnChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty)" /></label>
+        <label class="checkbox-line"><input type="checkbox" checked="@NewSeasonIsActive" @onchange="e => NewSeasonIsActiveChanged.InvokeAsync(e.Value is true)" /> Activa</label>
+        <button class="leagues-button" type="button" disabled="@IsSaving" @onclick="CreateSeason">Crear</button>
+    </div>
+</section>
+
+@code {
+    [Parameter] public IReadOnlyList<Season> Seasons { get; set; } = [];
+    [Parameter] public bool IsSaving { get; set; }
+    [Parameter] public string NewSeasonName { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> NewSeasonNameChanged { get; set; }
+    [Parameter] public string NewSeasonStartsOn { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> NewSeasonStartsOnChanged { get; set; }
+    [Parameter] public string NewSeasonEndsOn { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> NewSeasonEndsOnChanged { get; set; }
+    [Parameter] public bool NewSeasonIsActive { get; set; }
+    [Parameter] public EventCallback<bool> NewSeasonIsActiveChanged { get; set; }
+    [Parameter] public EventCallback CreateSeason { get; set; }
+}

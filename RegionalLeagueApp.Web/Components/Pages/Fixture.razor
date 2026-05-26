@@ -7,18 +7,22 @@
 
 <PageTitle>Fixture</PageTitle>
 
+<PageBreadcrumb BackHref="@BreadcrumbBackHref" ParentHref="@BreadcrumbParentHref" ParentLabel="@BreadcrumbParentLabel" CurrentLabel="@BreadcrumbCurrentLabel" />
+
 <div class="page-heading">
     <p class="eyebrow">Fixture</p>
     <h1>@PageTitleText</h1>
 </div>
 
+<LeagueCompetitionFilter Path="/fixture" LeagueId="@LeagueId" CompetitionId="@CompetitionId" />
+
 @if (matches.Count == 0)
 {
-    <EmptyState Text="No hay partidos programados." />
+    <EmptyState Text="@EmptyText" />
 }
 else
 {
-    @foreach (var group in matches.GroupBy(x => $"{x.Competition?.Name ?? "Competencia"} - {x.Round?.Name ?? "Sin fecha"}"))
+    @foreach (var group in matches.GroupBy(MatchGroupLabel))
     {
         <section class="panel section-gap">
             <h2>@group.Key</h2>
@@ -36,12 +40,28 @@ else
     private List<Match> matches = [];
     private Func<Task>? reloadHandler;
     private string? leagueName;
+    private string? competitionName;
 
     [SupplyParameterFromQuery] public Guid? LeagueId { get; set; }
+    [SupplyParameterFromQuery] public Guid? CompetitionId { get; set; }
 
     private string PageTitleText => string.IsNullOrWhiteSpace(leagueName)
         ? "Partidos programados"
         : $"Fixture - {leagueName}";
+
+    private string EmptyText => CompetitionId is not null
+        ? "No hay partidos programados para esta competencia."
+        : "No hay partidos programados.";
+
+    private string BreadcrumbBackHref => LeagueId is null ? "/" : $"/leagues/{LeagueId}";
+
+    private string BreadcrumbParentHref => LeagueId is null ? "/" : $"/leagues/{LeagueId}";
+
+    private string BreadcrumbParentLabel => LeagueId is null ? "Inicio" : leagueName ?? "Liga";
+
+    private string BreadcrumbCurrentLabel => string.IsNullOrWhiteSpace(competitionName)
+        ? "Fixture"
+        : $"{competitionName} / Fixture";
 
     protected override async Task OnParametersSetAsync()
     {
@@ -82,6 +102,14 @@ else
                 .Select(x => x.Name)
                 .FirstOrDefaultAsync();
 
+        competitionName = CompetitionId is null
+            ? null
+            : await Db.Competitions
+                .AsNoTracking()
+                .Where(x => x.Id == CompetitionId && x.IsActive)
+                .Select(x => x.Name)
+                .FirstOrDefaultAsync();
+
         var query = Db.Matches
             .AsNoTracking()
             .Include(x => x.Competition)!.ThenInclude(x => x!.Season)
@@ -102,6 +130,11 @@ else
             query = query.Where(x => x.Competition!.Season!.LeagueId == LeagueId);
         }
 
+        if (CompetitionId is not null)
+        {
+            query = query.Where(x => x.CompetitionId == CompetitionId);
+        }
+
         var loadedMatches = await query
             .OrderBy(x => x.Round!.SortOrder)
             .ThenBy(x => x.StartsAt)
@@ -120,4 +153,17 @@ else
         Away = match.AwayTeam?.Club?.Name ?? match.AwayTeam?.Name ?? string.Empty,
         match.Status
     };
+
+    private string MatchGroupLabel(Match match)
+    {
+        var competition = match.Competition?.Name ?? "Competencia";
+        var round = match.Round?.Name ?? "Sin fecha";
+        if (LeagueId is not null)
+        {
+            return $"{competition} - {round}";
+        }
+
+        var league = match.Competition?.Season?.League?.Name ?? "Liga";
+        return $"{league} - {competition} - {round}";
+    }
 }

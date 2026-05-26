@@ -1,0 +1,75 @@
+@using RegionalLeagueApp.Application.Discipline
+
+@{
+    var edit = GetEventEdit(Event);
+    var isEditing = EditingEventId == Event.Id;
+    var isSecondYellow = IsSecondYellow(Event);
+}
+
+<article class="admin-event-row @(isEditing ? "admin-event-row--editing" : string.Empty)">
+    <div class="admin-event-main">
+        <strong>@Event.Minute'</strong>
+        <span class="admin-event-kind">
+            <MatchEventIcon EventType="Event.EventType" IsSecondYellow="isSecondYellow" Compact="true" />
+            @EventLabel(Event)
+            @if (isSecondYellow)
+            {
+                <small class="second-yellow-badge">2da amarilla</small>
+            }
+        </span>
+        <small>@Event.TeamName</small>
+        <small>@Event.PlayerName</small>
+        <span class="admin-event-note">@(!string.IsNullOrWhiteSpace(Event.Notes) ? Event.Notes : "-")</span>
+        <div class="admin-event-actions">
+            @if (CanModerate)
+            {
+                <button type="button" class="admin-link-button" @onclick="() => BeginEdit.InvokeAsync(Event)">Editar</button>
+            }
+            <button type="button" class="admin-link-button admin-link-button-muted" @onclick="() => Delete.InvokeAsync(Event.Id)">@(CanModerate ? "Quitar evento" : "Proponer quitar")</button>
+        </div>
+    </div>
+
+    @if (isEditing && CanModerate)
+    {
+        <div class="admin-event-editor">
+            <MatchEventEditor
+                EditModel="@edit"
+                Players="@EventPlayers"
+                EventTypes="@EventTypes"
+                EventLabel="@EventTypeLabel"
+                HomeTeamId="@Match.HomeTeamId"
+                HomeTeamName="@Match.HomeTeamName"
+                AwayTeamId="@Match.AwayTeamId"
+                AwayTeamName="@Match.AwayTeamName"
+                IsEditPlayerSuspended="@(EditDiscipline?.Status == DisciplineStatus.Suspended)"
+                EditTeamChanged="@EditTeamChanged"
+                EditPlayerChanged="@EditPlayerChanged" />
+
+            <div class="admin-event-actions admin-event-editor-actions">
+                <button type="button" class="admin-link-button" disabled="@IsSavingEvent" @onclick="() => SaveEdit.InvokeAsync(Event.Id)">Guardar</button>
+                <button type="button" class="admin-link-button admin-link-button-muted" disabled="@IsSavingEvent" @onclick="CancelEdit">Cancelar</button>
+            </div>
+        </div>
+    }
+</article>
+
+@code {
+    [Parameter, EditorRequired] public AdminMatchEventRow Event { get; set; } = default!;
+    [Parameter, EditorRequired] public AdminMatchEditModel Match { get; set; } = default!;
+    [Parameter] public Guid? EditingEventId { get; set; }
+    [Parameter] public bool CanModerate { get; set; }
+    [Parameter] public bool IsSavingEvent { get; set; }
+    [Parameter] public IReadOnlyList<MatchEventType> EventTypes { get; set; } = [];
+    [Parameter] public IReadOnlyList<EventPlayerOption> EventPlayers { get; set; } = [];
+    [Parameter] public DisciplineRowDto? EditDiscipline { get; set; }
+    [Parameter] public Func<AdminMatchEventRow, EventEditModel> GetEventEdit { get; set; } = _ => new EventEditModel();
+    [Parameter] public Func<AdminMatchEventRow, string> EventLabel { get; set; } = item => item.EventType.ToString();
+    [Parameter] public Func<MatchEventType, string> EventTypeLabel { get; set; } = eventType => eventType.ToString();
+    [Parameter] public Func<AdminMatchEventRow, bool> IsSecondYellow { get; set; } = _ => false;
+    [Parameter] public EventCallback<AdminMatchEventRow> BeginEdit { get; set; }
+    [Parameter] public EventCallback<Guid> Delete { get; set; }
+    [Parameter] public EventCallback<Guid> SaveEdit { get; set; }
+    [Parameter] public EventCallback CancelEdit { get; set; }
+    [Parameter] public EventCallback<EventEditModel> EditTeamChanged { get; set; }
+    [Parameter] public EventCallback<ChangeEventArgs> EditPlayerChanged { get; set; }
+}

@@ -1,0 +1,56 @@
+<section class="league-ops-card admin-league-panel">
+    <PanelHeader Eyebrow="Temporadas -> Competencias" Title="Competencias" Meta="@($"{Competitions.Count} cargada(s)")" />
+    <div class="admin-compact-list">
+        @if (Competitions.Count == 0)
+        {
+            <span>No hay competencias cargadas.</span>
+        }
+        else
+        {
+            @foreach (var competition in Competitions.Take(4))
+            {
+                <span>@competition.SeasonName - @competition.Name</span>
+            }
+        }
+    </div>
+    <div class="league-ops-form">
+        <label>
+            Temporada
+            <select class="form-control" value="@NullableGuidValue(NewCompetitionSeasonId)" @onchange="OnSeasonChanged">
+                <option value="">Seleccionar</option>
+                @foreach (var season in Seasons)
+                {
+                    <option value="@season.Id">@season.Name</option>
+                }
+            </select>
+        </label>
+        <label>Nombre <input class="form-control" value="@NewCompetitionName" @oninput="e => NewCompetitionNameChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty)" maxlength="150" /></label>
+        <label>Formato <input class="form-control" value="@NewCompetitionFormat" @oninput="e => NewCompetitionFormatChanged.InvokeAsync(e.Value?.ToString() ?? string.Empty)" maxlength="50" /></label>
+        <label class="checkbox-line"><input type="checkbox" checked="@NewCompetitionIsActive" @onchange="e => NewCompetitionIsActiveChanged.InvokeAsync(e.Value is true)" /> Activa</label>
+        <button class="leagues-button" type="button" disabled="@IsSaving" @onclick="CreateCompetition">Crear</button>
+    </div>
+</section>
+
+@code {
+    [Parameter] public IReadOnlyList<Season> Seasons { get; set; } = [];
+    [Parameter] public IReadOnlyList<CompetitionItem> Competitions { get; set; } = [];
+    [Parameter] public bool IsSaving { get; set; }
+    [Parameter] public Guid? NewCompetitionSeasonId { get; set; }
+    [Parameter] public EventCallback<Guid?> NewCompetitionSeasonIdChanged { get; set; }
+    [Parameter] public string NewCompetitionName { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> NewCompetitionNameChanged { get; set; }
+    [Parameter] public string NewCompetitionFormat { get; set; } = "League";
+    [Parameter] public EventCallback<string> NewCompetitionFormatChanged { get; set; }
+    [Parameter] public bool NewCompetitionIsActive { get; set; }
+    [Parameter] public EventCallback<bool> NewCompetitionIsActiveChanged { get; set; }
+    [Parameter] public EventCallback CreateCompetition { get; set; }
+
+    private async Task OnSeasonChanged(ChangeEventArgs args)
+    {
+        await NewCompetitionSeasonIdChanged.InvokeAsync(ParseNullableGuid(args.Value?.ToString()));
+    }
+
+    private static string NullableGuidValue(Guid? value) => value?.ToString() ?? string.Empty;
+
+    private static Guid? ParseNullableGuid(string? value) => Guid.TryParse(value, out var id) ? id : null;
+}

@@ -8,14 +8,18 @@
 
 <PageTitle>Disciplina</PageTitle>
 
+<PageBreadcrumb BackHref="@BreadcrumbBackHref" ParentHref="@BreadcrumbParentHref" ParentLabel="@BreadcrumbParentLabel" CurrentLabel="@BreadcrumbCurrentLabel" />
+
 <div class="page-heading">
     <p class="eyebrow">Disciplina</p>
     <h1>@PageTitleText</h1>
 </div>
 
+<LeagueCompetitionFilter Path="/discipline" LeagueId="@LeagueId" CompetitionId="@CompetitionId" />
+
 @if (rows.Count == 0)
 {
-    <EmptyState Text="Todavia no hay tarjetas asociadas a jugadores." />
+    <EmptyState Text="@EmptyText" />
 }
 else
 {
@@ -58,13 +62,29 @@ else
 
 @code {
     [SupplyParameterFromQuery] public Guid? LeagueId { get; set; }
+    [SupplyParameterFromQuery] public Guid? CompetitionId { get; set; }
 
     private IReadOnlyList<DisciplineRowDto> rows = [];
     private string? leagueName;
+    private string? competitionName;
 
     private string PageTitleText => string.IsNullOrWhiteSpace(leagueName)
         ? "Sanciones y tarjetas"
         : $"Sanciones y tarjetas - {leagueName}";
+
+    private string EmptyText => CompetitionId is not null
+        ? "Todavia no hay tarjetas asociadas a jugadores en esta competencia."
+        : "Todavia no hay tarjetas asociadas a jugadores.";
+
+    private string BreadcrumbBackHref => LeagueId is null ? "/" : $"/leagues/{LeagueId}";
+
+    private string BreadcrumbParentHref => LeagueId is null ? "/" : $"/leagues/{LeagueId}";
+
+    private string BreadcrumbParentLabel => LeagueId is null ? "Inicio" : leagueName ?? "Liga";
+
+    private string BreadcrumbCurrentLabel => string.IsNullOrWhiteSpace(competitionName)
+        ? "Disciplina"
+        : $"{competitionName} / Disciplina";
 
     protected override async Task OnParametersSetAsync()
     {
@@ -76,7 +96,18 @@ else
                 .Select(x => x.Name)
                 .FirstOrDefaultAsync();
 
-        rows = await DisciplineQueryService.GetDisciplineAsync(LeagueId);
+        competitionName = CompetitionId is null
+            ? null
+            : await Db.Competitions
+                .AsNoTracking()
+                .Where(x => x.Id == CompetitionId && x.IsActive)
+                .Select(x => x.Name)
+                .FirstOrDefaultAsync();
+
+        var loadedRows = await DisciplineQueryService.GetDisciplineAsync(LeagueId);
+        rows = CompetitionId is null
+            ? loadedRows
+            : loadedRows.Where(x => x.CompetitionId == CompetitionId).ToList();
     }
 
     private static string DisciplineRowClass(DisciplineStatus status) => status switch

@@ -1,0 +1,32 @@
+<article class="panel admin-match-header-card">
+    <div class="admin-match-context">
+        <span>@Match.LeagueName</span>
+        <span>@Match.SeasonName</span>
+        <span>@Match.CompetitionName</span>
+        <span>@Match.RoundName</span>
+    </div>
+    <div class="admin-match-scoreboard">
+        <div>
+            <strong>@Match.HomeTeamName</strong>
+            <small>Local</small>
+        </div>
+        <div class="admin-match-score">
+            <StatusBadge MatchStatusValue="Match.Status" Compact="true" />
+            <strong>@ScoreText</strong>
+            <small>@Match.StartsAt.LocalDateTime.ToString("dd/MM/yyyy HH:mm")</small>
+        </div>
+        <div>
+            <strong>@Match.AwayTeamName</strong>
+            <small>Visitante</small>
+        </div>
+    </div>
+    <div class="admin-match-links">
+        <a class="admin-link-button admin-link-button-muted" href="/admin">Volver al admin</a>
+        <a class="admin-link-button" href="/matches/@Match.MatchId">Vista publica</a>
+    </div>
+</article>
+
+@code {
+    [Parameter, EditorRequired] public AdminMatchEditModel Match { get; set; } = default!;
+    [Parameter] public string ScoreText { get; set; } = "vs";
+}

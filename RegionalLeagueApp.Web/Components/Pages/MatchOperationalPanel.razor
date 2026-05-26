@@ -1,0 +1,58 @@
+<article class="panel admin-match-editor">
+    <div class="panel-title-row">
+        <PanelHeader Eyebrow="Partido" Title="Datos operativos" />
+    </div>
+
+    <EditForm Model="Match" OnValidSubmit="Save" class="admin-form" aria-busy="@IsSaving">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="admin-match-edit-grid">
+            <label>
+                Estado
+                <InputSelect class="form-control" @bind-Value="Match.Status">
+                    @foreach (var status in Enum.GetValues<MatchStatus>())
+                    {
+                        <option value="@status">@status</option>
+                    }
+                </InputSelect>
+            </label>
+            <label>
+                Fecha/hora
+                <input class="form-control" type="datetime-local" value="@Match.StartsAtInput" @oninput="e => Match.StartsAtInput = e.Value?.ToString() ?? string.Empty" disabled="@(!CanModerate)" />
+            </label>
+            <label>
+                Local
+                <InputSelect class="form-control" @bind-Value="Match.HomeTeamId" disabled="@(!CanModerate)">
+                    @foreach (var team in TeamOptions)
+                    {
+                        <option value="@team.Id">@team.Label</option>
+                    }
+                </InputSelect>
+            </label>
+            <label>
+                Visitante
+                <InputSelect class="form-control" @bind-Value="Match.AwayTeamId" disabled="@(!CanModerate)">
+                    @foreach (var team in TeamOptions)
+                    {
+                        <option value="@team.Id">@team.Label</option>
+                    }
+                </InputSelect>
+            </label>
+        </div>
+
+        <p class="admin-help-text">El marcador se calcula automaticamente desde los goles.</p>
+
+        <button class="btn btn-primary" type="submit" disabled="@IsSaving">
+            @(IsSaving ? "Guardando..." : CanModerate ? "Guardar cambios" : "Enviar propuesta")
+        </button>
+    </EditForm>
+</article>
+
+@code {
+    [Parameter, EditorRequired] public AdminMatchEditModel Match { get; set; } = default!;
+    [Parameter] public IReadOnlyList<TeamOption> TeamOptions { get; set; } = [];
+    [Parameter] public bool CanModerate { get; set; }
+    [Parameter] public bool IsSaving { get; set; }
+    [Parameter] public EventCallback Save { get; set; }
+}
