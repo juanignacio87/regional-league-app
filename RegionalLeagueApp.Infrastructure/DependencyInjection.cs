@@ -59,6 +59,7 @@ public static class DependencyInjection
         services.AddScoped<IMatchScoreRecalculationService, EfMatchScoreRecalculationService>();
         services.AddScoped<IFixtureCsvImportService, EfFixtureCsvImportService>();
         services.AddScoped<IFixtureGeneratorService, FixtureGeneratorService>();
+        services.AddScoped<IFixtureRulesService, EfFixtureRulesService>();
         services.AddScoped<IPlayerCsvImportService, EfPlayerCsvImportService>();
         services.AddScoped<IDisciplineQueryService, EfDisciplineQueryService>();
         services.AddScoped<IStandingsQueryService, EfStandingsQueryService>();

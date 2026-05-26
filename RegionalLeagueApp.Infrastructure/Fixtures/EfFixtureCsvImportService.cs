@@ -7,7 +7,7 @@ using RegionalLeagueApp.Infrastructure.Persistence;
 
 namespace RegionalLeagueApp.Infrastructure.Fixtures;
 
-public sealed class EfFixtureCsvImportService(ApplicationDbContext db) : IFixtureCsvImportService
+public sealed class EfFixtureCsvImportService(ApplicationDbContext db, IFixtureRulesService fixtureRules) : IFixtureCsvImportService
 {
     public async Task<FixtureCsvPreviewResult> PreviewAsync(Guid competitionId, string csv, CancellationToken cancellationToken = default)
     {
@@ -17,18 +17,6 @@ public sealed class EfFixtureCsvImportService(ApplicationDbContext db) : IFixtur
             .Select(x => new TeamLookupItem(x.Id, x.Name, x.Club!.Name, x.Club.ShortName))
             .ToListAsync(cancellationToken);
 
-        var existingMatches = await db.Matches
-            .AsNoTracking()
-            .Where(x => x.CompetitionId == competitionId)
-            .Select(x => new ExistingMatchItem(
-                x.Id,
-                x.Round != null ? x.Round.Name : string.Empty,
-                x.Round != null ? x.Round.SortOrder : 0,
-                x.HomeTeamId,
-                x.AwayTeamId,
-                x.StartsAt))
-            .ToListAsync(cancellationToken);
-
         var rows = ParseRows(csv);
         var preview = new List<FixtureCsvPreviewRow>();
         var csvExactKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -36,7 +24,7 @@ public sealed class EfFixtureCsvImportService(ApplicationDbContext db) : IFixtur
 
         foreach (var row in rows)
         {
-            preview.Add(ValidateRow(row, teams, existingMatches, csvExactKeys, csvRoundTeamKeys));
+            preview.Add(await ValidateRowAsync(competitionId, row, teams, csvExactKeys, csvRoundTeamKeys, cancellationToken));
         }
 
         return new FixtureCsvPreviewResult(preview);
@@ -107,12 +95,13 @@ public sealed class EfFixtureCsvImportService(ApplicationDbContext db) : IFixtur
         return result;
     }
 
-    private static FixtureCsvPreviewRow ValidateRow(
+    private async Task<FixtureCsvPreviewRow> ValidateRowAsync(
+        Guid competitionId,
         CsvFixtureRow row,
         IReadOnlyCollection<TeamLookupItem> teams,
-        IReadOnlyCollection<ExistingMatchItem> existingMatches,
         HashSet<string> csvExactKeys,
-        HashSet<string> csvRoundTeamKeys)
+        HashSet<string> csvRoundTeamKeys,
+        CancellationToken cancellationToken)
     {
         var startsAtText = $"{row.Date} {row.Time}";
 
@@ -165,20 +154,25 @@ public sealed class EfFixtureCsvImportService(ApplicationDbContext db) : IFixtur
 
         var startsAt = new DateTimeOffset(DateTime.SpecifyKind(date.ToDateTime(time), DateTimeKind.Local)).ToUniversalTime();
         var roundSortOrder = roundNumber;
-        var exactKey = ExactKey(homeMatch.Team.Id, awayMatch.Team.Id, startsAt);
-        if (existingMatches.Any(x => x.HomeTeamId == homeMatch.Team.Id && x.AwayTeamId == awayMatch.Team.Id && x.StartsAt == startsAt))
+        var ruleValidation = await fixtureRules.ValidateMatchCreationAsync(
+            new FixtureMatchRulesRequest(
+                competitionId,
+                RoundName(roundSortOrder),
+                roundSortOrder,
+                homeMatch.Team.Id,
+                awayMatch.Team.Id,
+                startsAt),
+            cancellationToken);
+
+        if (!ruleValidation.IsValid)
         {
-            return Duplicate(row, startsAtText, "Ya existe un partido con el mismo local, visitante y fecha/hora.", homeMatch.Team.Id, awayMatch.Team.Id, startsAt);
+            return Duplicate(row, startsAtText, ruleValidation.FirstError ?? "La fila no cumple las reglas de fixture.", homeMatch.Team.Id, awayMatch.Team.Id, startsAt);
         }
 
+        var exactKey = ExactKey(homeMatch.Team.Id, awayMatch.Team.Id, startsAt);
         if (!csvExactKeys.Add(exactKey))
         {
             return Duplicate(row, startsAtText, "Duplicado exacto dentro del CSV.", homeMatch.Team.Id, awayMatch.Team.Id, startsAt);
-        }
-
-        if (TeamAlreadyPlaysInRound(existingMatches, roundSortOrder, homeMatch.Team.Id, awayMatch.Team.Id))
-        {
-            return Duplicate(row, startsAtText, "Un equipo ya juega en esa jornada de la competencia.", homeMatch.Team.Id, awayMatch.Team.Id, startsAt);
         }
 
         var homeRoundKey = RoundTeamKey(roundSortOrder, homeMatch.Team.Id);
@@ -235,16 +229,6 @@ public sealed class EfFixtureCsvImportService(ApplicationDbContext db) : IFixtur
         };
     }
 
-    private static bool TeamAlreadyPlaysInRound(IEnumerable<ExistingMatchItem> matches, int roundSortOrder, Guid homeTeamId, Guid awayTeamId)
-    {
-        return matches.Any(x =>
-            x.RoundSortOrder == roundSortOrder &&
-            (x.HomeTeamId == homeTeamId ||
-             x.AwayTeamId == homeTeamId ||
-             x.HomeTeamId == awayTeamId ||
-             x.AwayTeamId == awayTeamId));
-    }
-
     private static string RoundName(int sortOrder) => $"Fecha {sortOrder}";
     private static string ExactKey(Guid homeTeamId, Guid awayTeamId, DateTimeOffset startsAt) => $"{homeTeamId:N}|{awayTeamId:N}|{startsAt:O}";
     private static string RoundTeamKey(int sortOrder, Guid teamId) => $"{sortOrder}|{teamId:N}";
@@ -260,6 +244,5 @@ public sealed class EfFixtureCsvImportService(ApplicationDbContext db) : IFixtur
     {
         public string Label => $"{ClubName} - {TeamName}";
     }
-    private sealed record ExistingMatchItem(Guid Id, string RoundName, int RoundSortOrder, Guid HomeTeamId, Guid AwayTeamId, DateTimeOffset StartsAt);
     private sealed record TeamMatchResult(TeamLookupItem? Team, string? Error);
 }

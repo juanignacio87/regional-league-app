@@ -7,7 +7,11 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IFixtureCsvImportService FixtureCsvImportService
 @inject IFixtureGeneratorService FixtureGeneratorService
+@inject IFixtureRulesService FixtureRulesService
+@inject ToastService ToastService
 @inject ILogger<AdminLeagueDetail> Logger
+
+<ToastContainer />
 
 <PageTitle>Administrar liga</PageTitle>
 
@@ -665,7 +669,7 @@ else
     {
         safeDeletableMatchCount = newMatchCompetitionId is null
             ? 0
-            : await SafeDeletableMatchesQuery(newMatchCompetitionId.Value).CountAsync();
+            : (await FixtureRulesService.GetSafeDeletableMatchIdsAsync(newMatchCompetitionId.Value)).Count;
     }
 
     private async Task CreateMatchAsync()
@@ -673,18 +677,14 @@ else
         if (newMatchCompetitionId is null || newMatchHomeTeamId is null || newMatchAwayTeamId is null)
         {
             SetMessage("Competencia, local y visitante son obligatorios.", false);
-            return;
-        }
-
-        if (newMatchHomeTeamId == newMatchAwayTeamId)
-        {
-            SetMessage("Local y visitante deben ser distintos.", false);
+            ToastService.Warning("Competencia, local y visitante son obligatorios.");
             return;
         }
 
         if (!DateTime.TryParse(newMatchStartsAt, out var startsAtLocal))
         {
             SetMessage("Fecha/hora de partido invalida.", false);
+            ToastService.Warning("Fecha/hora de partido invalida.");
             return;
         }
 
@@ -692,36 +692,23 @@ else
         if (!competitionIsActive)
         {
             SetMessage("No se pueden crear partidos en una competencia archivada o inexistente.", false);
-            return;
-        }
-
-        var teamIds = await Db.Teams
-            .AsNoTracking()
-            .Where(x => x.CompetitionId == newMatchCompetitionId && x.IsActive && x.Club!.IsActive)
-            .Select(x => x.Id)
-            .ToListAsync();
-        if (!teamIds.Contains(newMatchHomeTeamId.Value) || !teamIds.Contains(newMatchAwayTeamId.Value))
-        {
-            SetMessage("Ambos equipos deben pertenecer a la competencia.", false);
+            ToastService.Error("No se pueden crear partidos en una competencia archivada o inexistente.");
             return;
         }
 
         var roundName = MatchRoundName();
-        if (await TeamAlreadyPlaysInRoundAsync(newMatchCompetitionId.Value, roundName, newMatchHomeTeamId.Value, newMatchAwayTeamId.Value, null))
-        {
-            SetMessage("Un equipo no puede jugar mas de un partido en la misma jornada de la competencia.", false);
-            return;
-        }
-
         var startsAt = new DateTimeOffset(DateTime.SpecifyKind(startsAtLocal, DateTimeKind.Local)).ToUniversalTime();
-        var duplicateMatch = await Db.Matches.AnyAsync(x =>
-            x.CompetitionId == newMatchCompetitionId &&
-            x.HomeTeamId == newMatchHomeTeamId &&
-            x.AwayTeamId == newMatchAwayTeamId &&
-            x.StartsAt == startsAt);
-        if (duplicateMatch)
+        var validation = await FixtureRulesService.ValidateMatchCreationAsync(new FixtureMatchRulesRequest(
+            newMatchCompetitionId.Value,
+            roundName,
+            RoundSortOrderOrNull(roundName),
+            newMatchHomeTeamId.Value,
+            newMatchAwayTeamId.Value,
+            startsAt));
+        if (!validation.IsValid)
         {
-            SetMessage("Ya existe un partido con el mismo local, visitante y fecha/hora.", false);
+            SetMessage(validation.FirstError ?? "El partido no cumple las reglas de fixture.", false);
+            ToastService.Warning(validation.FirstError ?? "El partido no cumple las reglas de fixture.");
             return;
         }
 
@@ -742,6 +729,7 @@ else
         newMatchAwayTeamId = null;
         newMatchStartsAt = string.Empty;
         SetMessage("Partido creado correctamente.", true);
+        ToastService.Success("Partido creado correctamente.");
         await LoadAsync();
     }
 
@@ -750,17 +738,32 @@ else
         if (newMatchCompetitionId is null)
         {
             SetMessage("Selecciona una competencia antes de previsualizar el CSV.", false);
+            ToastService.Warning("Selecciona una competencia antes de previsualizar el CSV.");
             return;
         }
 
         if (string.IsNullOrWhiteSpace(fixtureCsvInput))
         {
             SetMessage("Pega el contenido CSV para previsualizar.", false);
+            ToastService.Info("Pega el contenido CSV para previsualizar.");
             return;
         }
 
         fixtureCsvPreview = await FixtureCsvImportService.PreviewAsync(newMatchCompetitionId.Value, fixtureCsvInput);
         SetMessage($"Preview generado: {fixtureCsvPreview.ValidCount} fila(s) valida(s) de {fixtureCsvPreview.Rows.Count}.", fixtureCsvPreview.ValidCount > 0);
+        var previewMessage = $"Preview generado: {fixtureCsvPreview.ValidCount} fila(s) valida(s) de {fixtureCsvPreview.Rows.Count}.";
+        if (fixtureCsvPreview.ValidCount == 0)
+        {
+            ToastService.Warning(previewMessage);
+        }
+        else if (fixtureCsvPreview.ValidCount < fixtureCsvPreview.Rows.Count)
+        {
+            ToastService.Warning(previewMessage);
+        }
+        else
+        {
+            ToastService.Info(previewMessage);
+        }
     }
 
     private async Task ConfirmFixtureCsvImportAsync()
@@ -768,6 +771,7 @@ else
         if (newMatchCompetitionId is null || fixtureCsvPreview is null)
         {
             SetMessage("Genera una previsualizacion antes de importar.", false);
+            ToastService.Info("Genera una nueva previsualizacion antes de confirmar otra importacion.");
             return;
         }
 
@@ -778,6 +782,7 @@ else
         if (validRows.Count == 0)
         {
             SetMessage("No hay filas validas para importar.", false);
+            ToastService.Warning("No hay filas validas para importar.");
             return;
         }
 
@@ -790,6 +795,15 @@ else
             await SafeReloadAsync();
             var failedMessage = failedRows > 0 ? $" {failedRows} fila(s) fallaron y no se guardaron." : string.Empty;
             SetMessage($"Se importaron {result.ImportedCount} partido(s).{failedMessage} Genera una nueva previsualizacion para volver a importar.", true);
+            if (failedRows > 0)
+            {
+                ToastService.Warning($"Se importaron {result.ImportedCount} partido(s), pero {failedRows} fila(s) fallaron.");
+                ToastService.Info("Genera una nueva previsualizacion antes de confirmar otra importacion.");
+            }
+            else
+            {
+                ToastService.Success($"Se importaron {result.ImportedCount} partido(s).");
+            }
         }
         catch (Exception ex)
         {
@@ -797,6 +811,7 @@ else
             fixtureCsvPreview = null;
             await SafeReloadAsync();
             SetMessage("No se pudo completar la importacion. Si algunos partidos se guardaron, genera una nueva previsualizacion antes de intentar otra vez.", false);
+            ToastService.Error("No se pudo completar la importacion.");
         }
         finally
         {
@@ -809,6 +824,7 @@ else
         if (newMatchCompetitionId is null)
         {
             SetMessage("Selecciona una competencia antes de generar fixture.", false);
+            ToastService.Warning("Selecciona una competencia antes de generar fixture.");
             return Task.CompletedTask;
         }
 
@@ -816,6 +832,7 @@ else
         {
             fixtureGeneratorPreview = null;
             SetMessage("La competencia necesita al menos dos equipos activos para generar fixture.", false);
+            ToastService.Warning("La competencia necesita al menos dos equipos activos para generar fixture.");
             return Task.CompletedTask;
         }
 
@@ -823,6 +840,7 @@ else
         {
             fixtureGeneratorPreview = null;
             SetMessage("Fecha inicial invalida.", false);
+            ToastService.Warning("Fecha inicial invalida.");
             return Task.CompletedTask;
         }
 
@@ -830,6 +848,7 @@ else
         {
             fixtureGeneratorPreview = null;
             SetMessage("Los dias entre jornadas deben ser un entero positivo.", false);
+            ToastService.Warning("Los dias entre jornadas deben ser un entero positivo.");
             return Task.CompletedTask;
         }
 
@@ -837,6 +856,7 @@ else
         {
             fixtureGeneratorPreview = null;
             SetMessage("Horario por defecto invalido.", false);
+            ToastService.Warning("Horario por defecto invalido.");
             return Task.CompletedTask;
         }
 
@@ -851,10 +871,12 @@ else
         if (!fixtureGeneratorPreview.IsValid)
         {
             SetMessage("El fixture generado tiene conflictos. Revisa el preview antes de confirmar.", false);
+            ToastService.Error("El fixture generado tiene conflictos. Revisa el preview antes de confirmar.");
             return Task.CompletedTask;
         }
 
         SetMessage($"Preview generado: {fixtureGeneratorPreview.RoundCount} jornada(s), {fixtureGeneratorPreview.MatchCount} partido(s).", fixtureGeneratorPreview.MatchCount > 0);
+        ToastService.Info($"Preview generado: {fixtureGeneratorPreview.RoundCount} jornada(s), {fixtureGeneratorPreview.MatchCount} partido(s).");
         return Task.CompletedTask;
     }
 
@@ -863,12 +885,14 @@ else
         if (newMatchCompetitionId is null || fixtureGeneratorPreview is null)
         {
             SetMessage("Genera una previsualizacion antes de confirmar el fixture.", false);
+            ToastService.Info("Genera una previsualizacion antes de confirmar el fixture.");
             return;
         }
 
         if (fixtureGeneratorPreview.MatchCount == 0)
         {
             SetMessage("No hay partidos para generar.", false);
+            ToastService.Warning("No hay partidos para generar.");
             return;
         }
 
@@ -876,6 +900,7 @@ else
         if (validationError is not null)
         {
             SetMessage(validationError, false);
+            ToastService.Error(validationError);
             return;
         }
 
@@ -904,6 +929,7 @@ else
             fixtureGeneratorPreview = null;
             await LoadFixtureSafetyCountsAsync();
             SetMessage($"Se generaron {importedCount} partido(s).", true);
+            ToastService.Success($"Se generaron {importedCount} partido(s).");
             await LoadAsync();
         }
         finally
@@ -922,24 +948,30 @@ else
         if (newMatchCompetitionId is null)
         {
             SetMessage("Selecciona una competencia para limpiar fixture.", false);
+            ToastService.Warning("Selecciona una competencia para limpiar fixture.");
             return;
         }
 
         isSaving = true;
         try
         {
-            var matchesToDelete = await SafeDeletableMatchesQuery(newMatchCompetitionId.Value).ToListAsync();
-            if (matchesToDelete.Count == 0)
+            var matchIdsToDelete = await FixtureRulesService.GetSafeDeletableMatchIdsAsync(newMatchCompetitionId.Value);
+            if (matchIdsToDelete.Count == 0)
             {
                 SetMessage("No hay partidos programados seguros para eliminar.", false);
+                ToastService.Info("No hay partidos programados seguros para eliminar.");
                 await LoadFixtureSafetyCountsAsync();
                 return;
             }
 
+            var matchesToDelete = await Db.Matches
+                .Where(match => matchIdsToDelete.Contains(match.Id))
+                .ToListAsync();
             Db.Matches.RemoveRange(matchesToDelete);
             await Db.SaveChangesAsync();
             fixtureGeneratorPreview = null;
             SetMessage($"Se eliminaron {matchesToDelete.Count} partido(s) programado(s).", true);
+            ToastService.Success($"Se eliminaron {matchesToDelete.Count} partido(s) programado(s).");
             await LoadAsync();
         }
         finally
@@ -958,28 +990,28 @@ else
         if (newMatchCompetitionId is null)
         {
             SetMessage("Selecciona una competencia para regenerar fixture.", false);
+            ToastService.Warning("Selecciona una competencia para regenerar fixture.");
             return;
         }
 
-        var hasBlockedMatches = await Db.Matches.AnyAsync(match =>
-            match.CompetitionId == newMatchCompetitionId &&
-            !(match.Status == MatchStatus.Scheduled &&
-              match.HomeScore == null &&
-              match.AwayScore == null &&
-              !match.Events.Any()));
+        var hasBlockedMatches = await FixtureRulesService.HasBlockingMatchesForRegenerationAsync(newMatchCompetitionId.Value);
 
         if (hasBlockedMatches)
         {
             SetMessage("No se puede regenerar porque la competencia tiene partidos con eventos, resultados o estado avanzado.", false);
+            ToastService.Error("No se puede regenerar: hay partidos con eventos o resultados.");
             return;
         }
 
         isSaving = true;
         try
         {
-            var matchesToDelete = await SafeDeletableMatchesQuery(newMatchCompetitionId.Value).ToListAsync();
-            if (matchesToDelete.Count > 0)
+            var matchIdsToDelete = await FixtureRulesService.GetSafeDeletableMatchIdsAsync(newMatchCompetitionId.Value);
+            if (matchIdsToDelete.Count > 0)
             {
+                var matchesToDelete = await Db.Matches
+                    .Where(match => matchIdsToDelete.Contains(match.Id))
+                    .ToListAsync();
                 Db.Matches.RemoveRange(matchesToDelete);
                 await Db.SaveChangesAsync();
             }
@@ -995,14 +1027,6 @@ else
         await PreviewGeneratedFixtureAsync();
     }
 
-    private IQueryable<Match> SafeDeletableMatchesQuery(Guid competitionId) =>
-        Db.Matches.Where(match =>
-            match.CompetitionId == competitionId &&
-            match.Status == MatchStatus.Scheduled &&
-            match.HomeScore == null &&
-            match.AwayScore == null &&
-            !match.Events.Any());
-
     private async Task<string?> ValidateGeneratedFixtureForSaveAsync(Guid competitionId, FixtureGeneratorPreviewResult preview)
     {
         if (!preview.IsValid)
@@ -1010,36 +1034,20 @@ else
             return string.Join(" ", preview.ValidationErrors);
         }
 
-        foreach (var round in preview.Rounds)
-        {
-            var generatedTeamIds = new HashSet<Guid>();
-            foreach (var match in round.Matches.Where(match => !match.IsBye && match.AwayTeamId is not null))
-            {
-                if (!generatedTeamIds.Add(match.HomeTeamId) || !generatedTeamIds.Add(match.AwayTeamId!.Value))
-                {
-                    return $"{round.RoundName}: un equipo aparece mas de una vez en el fixture generado.";
-                }
-            }
+        var batch = preview.Rounds
+            .SelectMany(round => round.Matches
+                .Where(match => !match.IsBye && match.AwayTeamId is not null)
+                .Select(match => new FixtureBatchMatchRequest(
+                    $"{round.RoundName} - {match.HomeTeamName} vs {match.AwayTeamName}",
+                    round.RoundName,
+                    round.RoundNumber,
+                    match.HomeTeamId,
+                    match.AwayTeamId!.Value,
+                    ToUtc(match.Date.ToDateTime(match.Time).ToString("yyyy-MM-ddTHH:mm")))))
+            .ToList();
 
-            var existingMatches = await Db.Matches
-                .AsNoTracking()
-                .Where(match => match.CompetitionId == competitionId && match.Round!.SortOrder == round.RoundNumber)
-                .Select(match => new { match.HomeTeamId, match.AwayTeamId })
-                .ToListAsync();
-            var existingTeamIds = existingMatches
-                .SelectMany(match => new[] { match.HomeTeamId, match.AwayTeamId })
-                .ToHashSet();
-
-            foreach (var match in round.Matches.Where(match => !match.IsBye && match.AwayTeamId is not null))
-            {
-                if (existingTeamIds.Contains(match.HomeTeamId) || existingTeamIds.Contains(match.AwayTeamId!.Value))
-                {
-                    return $"{round.RoundName}: {match.HomeTeamName} o {match.AwayTeamName} ya tiene partido cargado en esa jornada.";
-                }
-            }
-        }
-
-        return null;
+        var validation = await FixtureRulesService.ValidateFixtureBatchAsync(competitionId, batch);
+        return validation.IsValid ? null : validation.FirstError;
     }
 
     private async Task SafeReloadAsync()
@@ -1068,6 +1076,12 @@ else
         return int.TryParse(digits, out var value) ? value : int.MaxValue;
     }
 
+    private static int? RoundSortOrderOrNull(string roundName)
+    {
+        var digits = new string(roundName.Where(char.IsDigit).ToArray());
+        return int.TryParse(digits, out var value) ? value : null;
+    }
+
     private void BeginMatchEdit(Match match)
     {
         newMatchCompetitionId = match.CompetitionId;
@@ -1090,6 +1104,7 @@ else
         if (newMatchCompetitionId is null || !matchEdits.TryGetValue(matchId, out var edit))
         {
             SetMessage("No se encontro la edicion del partido.", false);
+            ToastService.Error("No se encontro la edicion del partido.");
             return;
         }
 
@@ -1097,6 +1112,7 @@ else
         if (validation is not null)
         {
             SetMessage(validation, false);
+            ToastService.Warning(validation);
             return;
         }
 
@@ -1104,6 +1120,7 @@ else
         if (match is null)
         {
             SetMessage("Partido no encontrado.", false);
+            ToastService.Error("Partido no encontrado.");
             return;
         }
 
@@ -1122,6 +1139,7 @@ else
             await Db.SaveChangesAsync();
             editingMatchId = null;
             SetMessage("Partido actualizado correctamente.", true);
+            ToastService.Success("Partido actualizado correctamente.");
             await LoadAsync();
         }
         finally
@@ -1147,52 +1165,22 @@ else
 
     private async Task<string?> ValidateMatchEditAsync(Guid competitionId, MatchEditModel edit, Guid currentMatchId)
     {
-        if (edit.HomeTeamId == edit.AwayTeamId)
-        {
-            return "Local y visitante deben ser distintos.";
-        }
-
         if (!DateTime.TryParse(edit.StartsAt, out _))
         {
             return "Fecha/hora de partido invalida.";
         }
 
-        var teamIds = await Db.Teams
-            .AsNoTracking()
-            .Where(x => x.CompetitionId == competitionId && x.IsActive && x.Club!.IsActive)
-            .Select(x => x.Id)
-            .ToListAsync();
-        if (!teamIds.Contains(edit.HomeTeamId) || !teamIds.Contains(edit.AwayTeamId))
-        {
-            return "Ambos equipos deben estar activos y pertenecer a la competencia.";
-        }
-
         var roundName = string.IsNullOrWhiteSpace(edit.RoundName) ? "Fecha 1" : edit.RoundName.Trim();
-        if (await TeamAlreadyPlaysInRoundAsync(competitionId, roundName, edit.HomeTeamId, edit.AwayTeamId, currentMatchId))
-        {
-            return "Un equipo no puede jugar mas de un partido en la misma jornada de la competencia.";
-        }
-
         var startsAt = ToUtc(edit.StartsAt);
-        var duplicateMatch = await Db.Matches.AnyAsync(x =>
-            x.CompetitionId == competitionId &&
-            x.Id != currentMatchId &&
-            x.HomeTeamId == edit.HomeTeamId &&
-            x.AwayTeamId == edit.AwayTeamId &&
-            x.StartsAt == startsAt);
-        return duplicateMatch ? "Ya existe un partido con el mismo local, visitante y fecha/hora." : null;
-    }
+        var validation = await FixtureRulesService.ValidateMatchUpdateAsync(currentMatchId, new FixtureMatchRulesRequest(
+            competitionId,
+            roundName,
+            RoundSortOrderOrNull(roundName),
+            edit.HomeTeamId,
+            edit.AwayTeamId,
+            startsAt));
 
-    private async Task<bool> TeamAlreadyPlaysInRoundAsync(Guid competitionId, string roundName, Guid homeTeamId, Guid awayTeamId, Guid? currentMatchId)
-    {
-        return await Db.Matches.AnyAsync(x =>
-            x.CompetitionId == competitionId &&
-            (currentMatchId == null || x.Id != currentMatchId.Value) &&
-            x.Round!.Name == roundName &&
-            (x.HomeTeamId == homeTeamId ||
-             x.AwayTeamId == homeTeamId ||
-             x.HomeTeamId == awayTeamId ||
-             x.AwayTeamId == awayTeamId));
+        return validation.IsValid ? null : validation.FirstError;
     }
 
     private async Task<Round> FindOrCreateRoundAsync(Guid competitionId, string roundName)

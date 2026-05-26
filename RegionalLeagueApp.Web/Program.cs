@@ -22,6 +22,7 @@ builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddScoped<MatchUpdatesClient>();
+builder.Services.AddScoped<ToastService>();
 builder.Services.AddSignalR();
 builder.Services.AddHealthChecks();
 

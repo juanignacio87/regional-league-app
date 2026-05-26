@@ -1,0 +1,89 @@
+@implements IDisposable
+@inject ToastService ToastService
+
+<div class="toast-container" aria-live="polite" aria-atomic="true">
+    @foreach (var toast in toasts)
+    {
+        <section class="toast-item toast-item--@CssType(toast.Type)" role="status">
+            <div>
+                <strong>@TitleFor(toast)</strong>
+                <p>@toast.Message</p>
+            </div>
+            <button type="button" class="toast-close" aria-label="Cerrar notificacion" @onclick="() => RemoveToast(toast.Id)">x</button>
+        </section>
+    }
+</div>
+
+@code {
+    private readonly List<ToastMessage> toasts = [];
+    private readonly Dictionary<Guid, CancellationTokenSource> timers = [];
+
+    protected override void OnInitialized()
+    {
+        ToastService.OnShow += ShowToast;
+    }
+
+    private void ShowToast(ToastMessage toast)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            toasts.Add(toast);
+            StateHasChanged();
+
+            var cancellation = new CancellationTokenSource();
+            timers[toast.Id] = cancellation;
+
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(5), cancellation.Token);
+                RemoveToast(toast.Id);
+            }
+            catch (TaskCanceledException)
+            {
+            }
+        });
+    }
+
+    private void RemoveToast(Guid id)
+    {
+        if (timers.Remove(id, out var cancellation))
+        {
+            cancellation.Cancel();
+            cancellation.Dispose();
+        }
+
+        var removed = toasts.RemoveAll(toast => toast.Id == id) > 0;
+        if (removed)
+        {
+            _ = InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private static string CssType(ToastType type) => type.ToString().ToLowerInvariant();
+
+    private static string TitleFor(ToastMessage toast)
+    {
+        if (!string.IsNullOrWhiteSpace(toast.Title))
+        {
+            return toast.Title;
+        }
+
+        return toast.Type switch
+        {
+            ToastType.Success => "Listo",
+            ToastType.Warning => "Atencion",
+            ToastType.Error => "Error",
+            _ => "Informacion"
+        };
+    }
+
+    public void Dispose()
+    {
+        ToastService.OnShow -= ShowToast;
+        foreach (var cancellation in timers.Values)
+        {
+            cancellation.Cancel();
+            cancellation.Dispose();
+        }
+    }
+}

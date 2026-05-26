@@ -336,6 +336,81 @@ p {
     color: #40514d;
 }
 
+.toast-container {
+    bottom: 1rem;
+    display: grid;
+    gap: .65rem;
+    max-width: min(360px, calc(100vw - 2rem));
+    position: fixed;
+    right: 1rem;
+    z-index: 1200;
+}
+
+.toast-item {
+    align-items: flex-start;
+    background: #ffffff;
+    border: 1px solid #dfe8e5;
+    border-left: 5px solid #60736e;
+    border-radius: 10px;
+    box-shadow: 0 16px 42px rgba(15, 31, 28, .16);
+    display: flex;
+    gap: .8rem;
+    justify-content: space-between;
+    padding: .85rem .85rem .8rem 1rem;
+}
+
+.toast-item strong {
+    color: #11211f;
+    display: block;
+    font-size: .9rem;
+    margin-bottom: .2rem;
+}
+
+.toast-item p {
+    color: #40514d;
+    font-size: .86rem;
+    line-height: 1.35;
+    margin: 0;
+}
+
+.toast-item--success {
+    border-left-color: #149661;
+}
+
+.toast-item--warning {
+    border-left-color: #f59e0b;
+}
+
+.toast-item--error {
+    border-left-color: #dc2626;
+}
+
+.toast-item--info {
+    border-left-color: #2563eb;
+}
+
+.toast-close {
+    align-items: center;
+    background: #f3f7f5;
+    border: 1px solid #dfe8e5;
+    border-radius: 999px;
+    color: #40514d;
+    cursor: pointer;
+    display: inline-flex;
+    flex: 0 0 auto;
+    font-size: .8rem;
+    font-weight: 900;
+    height: 1.65rem;
+    justify-content: center;
+    line-height: 1;
+    width: 1.65rem;
+}
+
+.toast-close:hover {
+    background: #e6f3ef;
+    color: #0f4f43;
+}
+
 .ui-table {
     border-collapse: collapse;
     width: 100%;
@@ -3212,6 +3287,26 @@ p {
     align-items: center;
     display: flex;
     gap: .5rem;
+}
+
+.league-ops-form .checkbox-line {
+    align-items: center;
+    display: inline-flex;
+    flex-direction: row;
+    gap: .45rem;
+    justify-content: flex-start;
+    min-height: 2.35rem;
+}
+
+.league-ops-form .checkbox-line input[type="checkbox"] {
+    flex: 0 0 auto;
+    height: 1rem;
+    margin: 0;
+    width: 1rem;
+}
+
+.league-ops-form .checkbox-line span {
+    line-height: 1.2;
 }
 
 .valid.modified:not([type=checkbox]) {
