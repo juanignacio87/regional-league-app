@@ -186,6 +186,76 @@ PostgreSQL persistente:
 regional-league-app-postgres -> /var/lib/postgresql/data
 ```
 
+## Backups
+
+La estrategia de backup para deploy Docker/ZimaBoard esta documentada en [DEPLOYMENT.md](DEPLOYMENT.md).
+
+Incluye:
+
+- backup manual de PostgreSQL con `pg_dump` desde `regional-league-app-postgres`
+- restore con `pg_restore`
+- backup del volumen `regional-league-app-uploads`
+- recomendacion de SSD para datos activos y HDD USB para backups
+- advertencia de probar restore antes de depender del backup
+
+## CI/CD
+
+El workflow de GitHub Actions esta en:
+
+```text
+.github/workflows/docker-deploy.yml
+```
+
+Hace:
+
+- `dotnet restore`
+- `dotnet build` en Release
+- `dotnet test`
+- `docker build`
+- `docker push` a GitHub Container Registry
+
+La imagen publicada queda como:
+
+```text
+ghcr.io/<OWNER>/regional-league-app-web:latest
+```
+
+Disparadores:
+
+- push a `main`
+- ejecucion manual desde `workflow_dispatch`
+
+### GHCR
+
+El workflow usa `secrets.GITHUB_TOKEN`, que GitHub crea automaticamente. El repositorio necesita permisos de workflow:
+
+```yaml
+permissions:
+  contents: read
+  packages: write
+```
+
+Para publicar con `GITHUB_TOKEN`:
+
+1. Ir a `Settings > Actions > General`.
+2. Verificar que GitHub Actions este habilitado.
+3. En `Workflow permissions`, permitir permisos de lectura/escritura si la organizacion lo requiere.
+4. Ejecutar el workflow desde `Actions` o hacer push a `main`.
+
+Si la organizacion o el repositorio requieren un token personal, crear un PAT con permisos:
+
+- `write:packages`
+- `read:packages`
+- `repo` solo si el repositorio es privado y el flujo lo requiere
+
+Guardar el PAT como secret, por ejemplo `GHCR_TOKEN`, y cambiar el login del workflow para usar:
+
+```yaml
+password: ${{ secrets.GHCR_TOKEN }}
+```
+
+No hay deploy automatico todavia: el workflow solo construye, testea y publica la imagen.
+
 ## Credenciales Demo
 
 En `DevelopmentLocal`:

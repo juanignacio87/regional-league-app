@@ -8,6 +8,7 @@ COPY ["RegionalLeagueApp.Domain/RegionalLeagueApp.Domain.csproj", "RegionalLeagu
 COPY ["RegionalLeagueApp.Application/RegionalLeagueApp.Application.csproj", "RegionalLeagueApp.Application/"]
 COPY ["RegionalLeagueApp.Infrastructure/RegionalLeagueApp.Infrastructure.csproj", "RegionalLeagueApp.Infrastructure/"]
 COPY ["RegionalLeagueApp.Web/RegionalLeagueApp.Web.csproj", "RegionalLeagueApp.Web/"]
+COPY ["RegionalLeagueApp.Tests/RegionalLeagueApp.Tests.csproj", "RegionalLeagueApp.Tests/"]
 
 RUN dotnet restore "RegionalLeagueApp.sln"
 
