@@ -1,13 +1,12 @@
 services:
   web:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: regional-league-app-web:latest
+    image: ghcr.io/juanignacio87/regional-league-app-web:latest
     container_name: regional-league-app-web
     depends_on:
       postgres:
         condition: service_healthy
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
@@ -37,6 +36,8 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: regional-league-app-postgres
+    labels:
+      com.centurylinklabs.watchtower.enable: "false"
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}

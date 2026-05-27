@@ -33,6 +33,108 @@ export POSTGRES_CONTAINER=regional-league-app-postgres
 export UPLOADS_VOLUME=regional-league-app-uploads
 ```
 
+## Automatic Updates from GHCR with Watchtower
+
+The production `docker-compose.yml` uses the image published by GitHub Actions:
+
+```text
+ghcr.io/juanignacio87/regional-league-app-web:latest
+```
+
+The `web` service is labeled for Watchtower updates, while `postgres` is explicitly excluded. This keeps PostgreSQL data persistent in the Docker volume and avoids replacing the database container during app image updates.
+
+The compose file remains compatible with Portainer: deploy the stack from `docker-compose.yml`, configure the same `.env` values, and Portainer will pull the GHCR image instead of building it locally.
+
+### Install Watchtower Manually
+
+Do not install Watchtower from this repository automatically. On the ZimaBoard, install it only when you are ready to enable automatic updates:
+
+```bash
+docker run -d \
+  --name watchtower \
+  --restart unless-stopped \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  containrrr/watchtower \
+  --label-enable \
+  --cleanup \
+  --interval 300
+```
+
+With `--label-enable`, Watchtower only updates containers that have:
+
+```yaml
+com.centurylinklabs.watchtower.enable: "true"
+```
+
+In this stack, that means only `regional-league-app-web`.
+
+If the GHCR package is private, log in on the ZimaBoard before starting or restarting the stack:
+
+```bash
+echo "$GHCR_TOKEN" | docker login ghcr.io -u juanignacio87 --password-stdin
+```
+
+Use a GitHub token with package read permissions.
+
+### How Auto-Update Works
+
+1. GitHub Actions builds and publishes `ghcr.io/juanignacio87/regional-league-app-web:latest`.
+2. Watchtower checks Docker Hub/GHCR on the configured interval.
+3. When `latest` points to a newer image, Watchtower pulls it.
+4. Watchtower recreates only the labeled `web` container.
+5. The existing PostgreSQL and uploads volumes remain mounted:
+
+```text
+regional-league-app-postgres -> /var/lib/postgresql/data
+regional-league-app-uploads  -> /app/wwwroot/uploads
+```
+
+### Auto-Update Risks
+
+- A bad image pushed to `latest` can be deployed automatically.
+- Database migrations or incompatible schema changes can break startup if they are not planned carefully.
+- The app container restarts during the update, causing a short interruption.
+- If GHCR authentication expires or the package is private and Docker is not logged in, updates will fail.
+
+Before relying on auto-update, keep tested PostgreSQL and uploads backups available.
+
+### Rollback
+
+If the latest image fails, rollback to a known-good image tag. Prefer immutable version tags when the workflow publishes them. If only `latest` exists, use the previous image ID from Docker if it is still present locally.
+
+Show recent images:
+
+```bash
+docker images ghcr.io/juanignacio87/regional-league-app-web
+```
+
+Temporarily pin the `web` service in `docker-compose.yml` to a known-good tag or digest:
+
+```yaml
+image: ghcr.io/juanignacio87/regional-league-app-web:<known-good-tag>
+```
+
+Then redeploy:
+
+```bash
+docker compose pull web
+docker compose up -d web
+```
+
+If Watchtower is running, either keep the rollback tag pinned until a fixed release is available or pause Watchtower:
+
+```bash
+docker stop watchtower
+```
+
+After publishing a fixed image, restore the `latest` image reference and redeploy:
+
+```bash
+docker compose pull web
+docker compose up -d web
+docker start watchtower
+```
+
 ## Manual PostgreSQL Backup
 
 From the repository folder on the ZimaBoard:
