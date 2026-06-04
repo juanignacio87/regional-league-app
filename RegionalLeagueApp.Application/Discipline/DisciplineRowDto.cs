@@ -3,7 +3,7 @@ namespace RegionalLeagueApp.Application.Discipline;
 public sealed record DisciplineRowDto(
     Guid CompetitionId,
     string CompetitionName,
-    Guid PlayerId,
+    Guid? PlayerId,
     string PlayerName,
     Guid TeamId,
     string TeamName,

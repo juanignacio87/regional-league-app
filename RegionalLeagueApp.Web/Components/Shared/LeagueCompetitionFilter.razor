@@ -26,12 +26,12 @@
         </label>
     </div>
     <nav class="fixture-filter-links" aria-label="Navegacion contextual deportiva">
-        <a href="@ContextHref("/fixture")">Fixture</a>
-        <a href="@ContextHref("/results")">Resultados</a>
-        <a href="@ContextHref("/standings")">Tabla</a>
-        <a href="@ContextHref("/clubs")">Clubes</a>
-        <a href="@ContextHref("/scorers")">Goleadores</a>
-        <a href="@ContextHref("/discipline")">Disciplina</a>
+        <a class="@ContextLinkClass("/fixture")" href="@ContextHref("/fixture")">Fixture</a>
+        <a class="@ContextLinkClass("/results")" href="@ContextHref("/results")">Resultados</a>
+        <a class="@ContextLinkClass("/standings")" href="@ContextHref("/standings")">Tabla</a>
+        <a class="@ContextLinkClass("/clubs")" href="@ContextHref("/clubs")">Clubes</a>
+        <a class="@ContextLinkClass("/scorers")" href="@ContextHref("/scorers")">Goleadores</a>
+        <a class="@ContextLinkClass("/discipline")" href="@ContextHref("/discipline")">Disciplina</a>
     </nav>
 </section>
 
@@ -97,6 +97,14 @@
         return CompetitionId is null
             ? $"{path}?leagueId={LeagueId}"
             : $"{path}?leagueId={LeagueId}&competitionId={CompetitionId}";
+    }
+
+    private string ContextLinkClass(string path)
+    {
+        var normalizedPath = Path.StartsWith('/') ? Path : $"/{Path}";
+        return string.Equals(normalizedPath, path, StringComparison.OrdinalIgnoreCase)
+            ? "fixture-filter-link is-active"
+            : "fixture-filter-link";
     }
 
     private sealed record FilterOption(Guid Id, string Name);

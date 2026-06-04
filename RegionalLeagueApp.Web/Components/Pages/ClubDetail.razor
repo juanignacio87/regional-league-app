@@ -7,6 +7,7 @@
 @inject ApplicationDbContext Db
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IPlayerCsvImportService PlayerCsvImportService
+@inject IManualPlayerValidationService ManualPlayerValidationService
 @inject IWebHostEnvironment Environment
 
 <PageTitle>Club</PageTitle>
@@ -478,10 +479,20 @@ else
             return;
         }
 
-        if (isActive && player.ShirtNumber is not null && await ActiveShirtExistsAsync(player.TeamId, player.ShirtNumber.Value, player.Id))
+        if (isActive)
         {
-            SetMessage("No se puede reactivar: ya hay un jugador activo con ese dorsal en el equipo.", false);
-            return;
+            var validation = await ManualPlayerValidationService.ValidateAsync(new ManualPlayerValidationRequest(
+                player.TeamId,
+                player.DisplayName,
+                player.ShirtNumber,
+                true,
+                player.BirthDate,
+                player.Id));
+            if (validation is not null)
+            {
+                SetMessage($"No se puede reactivar: {validation}", false);
+                return;
+            }
         }
 
         player.SetActive(isActive);
@@ -544,38 +555,16 @@ else
 
     private async Task<string?> ValidatePlayerAsync(Guid teamId, PlayerEditModel model, Guid? currentPlayerId)
     {
-        if (string.IsNullOrWhiteSpace(model.DisplayName))
-        {
-            return "El display name es obligatorio.";
-        }
-
         var shirtNumber = ParseShirtNumber(model.ShirtNumber);
-        if (shirtNumber is <= 0)
-        {
-            return "El dorsal debe ser un numero positivo.";
-        }
-
         var birthDate = ParseBirthDate(model.BirthDate);
-        if (birthDate is not null && birthDate > DateOnly.FromDateTime(DateTime.Today))
-        {
-            return "La fecha de nacimiento no puede estar en el futuro.";
-        }
 
-        if (model.IsActive && shirtNumber is not null && await ActiveShirtExistsAsync(teamId, shirtNumber.Value, currentPlayerId))
-        {
-            return "Ya existe un jugador activo con ese dorsal en este equipo.";
-        }
-
-        return null;
-    }
-
-    private async Task<bool> ActiveShirtExistsAsync(Guid teamId, int shirtNumber, Guid? currentPlayerId)
-    {
-        return await Db.Players.AnyAsync(x =>
-            x.TeamId == teamId &&
-            x.IsActive &&
-            x.ShirtNumber == shirtNumber &&
-            (currentPlayerId == null || x.Id != currentPlayerId.Value));
+        return await ManualPlayerValidationService.ValidateAsync(new ManualPlayerValidationRequest(
+            teamId,
+            model.DisplayName,
+            shirtNumber,
+            model.IsActive,
+            birthDate,
+            currentPlayerId));
     }
 
     private static int? ParseShirtNumber(string value) =>

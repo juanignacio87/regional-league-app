@@ -2,7 +2,9 @@
 @rendermode InteractiveServer
 @implements IDisposable
 @using Microsoft.EntityFrameworkCore
+@using RegionalLeagueApp.Application.Scorers
 @inject ApplicationDbContext Db
+@inject IScorersQueryService ScorersQueryService
 @inject MatchUpdatesClient MatchUpdatesClient
 
 <PageTitle>Goleadores</PageTitle>
@@ -57,7 +59,7 @@ else
 }
 
 @code {
-    private List<ScorerRow> scorers = [];
+    private IReadOnlyList<ScorerRowDto> scorers = [];
     private Func<Task>? reloadHandler;
     private string? leagueName;
     private string? competitionName;
@@ -130,51 +132,6 @@ else
                 .Select(x => x.Name)
                 .FirstOrDefaultAsync();
 
-        var goalEvents = await Db.MatchEvents
-            .AsNoTracking()
-            .Where(x =>
-                x.Type == MatchEventType.Goal &&
-                (x.PlayerId != null || x.PlayerName != string.Empty) &&
-                x.Team!.IsActive &&
-                x.Team.Club!.IsActive &&
-                x.Match!.Competition!.IsActive &&
-                x.Match.Competition.Season!.League!.IsActive &&
-                (LeagueId == null || x.Match.Competition.Season.LeagueId == LeagueId) &&
-                (CompetitionId == null || x.Match.CompetitionId == CompetitionId) &&
-                (x.Player == null || x.Player.IsActive))
-            .Select(x => new
-            {
-                x.PlayerId,
-                PlayerName = x.PlayerName != string.Empty
-                    ? x.PlayerName
-                    : x.Player != null
-                        ? x.Player.DisplayName
-                        : string.Empty,
-                TeamName = x.Team != null ? x.Team.Club!.Name : "Sin equipo",
-                CompetitionId = x.Match!.CompetitionId,
-                CompetitionName = x.Match.Competition!.Name
-            })
-            .ToListAsync();
-
-        scorers = goalEvents
-            .Where(x => !string.IsNullOrWhiteSpace(x.PlayerName))
-            .GroupBy(x => new
-            {
-                PlayerKey = x.PlayerId?.ToString() ?? x.PlayerName.Trim().ToUpperInvariant(),
-                x.TeamName,
-                x.CompetitionId,
-                x.CompetitionName
-            })
-            .Select(group => new ScorerRow(
-                group.First().PlayerId,
-                group.OrderByDescending(x => x.PlayerId != null).First().PlayerName,
-                group.Key.TeamName,
-                group.Key.CompetitionName,
-                group.Count()))
-            .OrderByDescending(x => x.Goals)
-            .ThenBy(x => x.PlayerName)
-            .ToList();
+        scorers = await ScorersQueryService.GetScorersAsync(LeagueId, CompetitionId);
     }
-
-    private sealed record ScorerRow(Guid? PlayerId, string PlayerName, string TeamName, string CompetitionName, int Goals);
 }

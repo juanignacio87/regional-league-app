@@ -25,6 +25,7 @@ else
                 <a href="/results?leagueId=@league.Id">Resultados</a>
                 <a href="/clubs?leagueId=@league.Id">Clubes</a>
                 <a href="/scorers?leagueId=@league.Id">Goleadores</a>
+                <a href="/discipline?leagueId=@league.Id">Disciplina</a>
                 @if (canManage)
                 {
                     <a class="hero-actions__admin" href="/admin/leagues/@league.Id">Administrar liga</a>
@@ -88,12 +89,12 @@ else
                                     }
                                     else
                                     {
-                                        <div class="leagues-participants">
+                                        <div class="leagues-participants leagues-participants--compact">
                                             @foreach (var team in competition.Teams.Where(x => x.IsActive && x.Club is not null && x.Club.IsActive).OrderBy(x => x.Club!.Name))
                                             {
-                                                <a class="leagues-participant" href="/clubs/@team.ClubId">
-                                                    <ClubLogo Name="@team.Club!.Name" LogoPath="@team.Club.LogoPath" />
-                                                    <div><strong>@team.Club.Name</strong><span>@team.Name - @team.Category</span></div>
+                                                <a class="leagues-participant leagues-participant--compact" href="/clubs/@team.ClubId">
+                                                    <ClubLogo Name="@DisplayClubName(team.Club!)" LogoPath="@team.Club!.LogoPath" Class="club-logo-xs" />
+                                                    <div><strong>@DisplayClubName(team.Club!)</strong><span>@team.Category</span></div>
                                                 </a>
                                             }
                                         </div>
@@ -216,6 +217,8 @@ else
 
         return $"{region}, {country}";
     }
+
+    private static string DisplayClubName(Club club) => string.IsNullOrWhiteSpace(club.ShortName) ? club.Name : club.ShortName;
 
     private sealed record CompetitionItem(Guid Id, string Name, string SeasonName, string Format, int TeamCount);
     private sealed record ParticipantItem(Guid ClubId, string ClubName, string? LogoPath, string TeamName);

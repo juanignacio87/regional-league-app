@@ -658,44 +658,57 @@ else
             return;
         }
 
-        successMessage = null;
-        errorMessage = Validate(eventForm, editing, eventPlayers);
-        if (errorMessage is not null)
-        {
-            return;
-        }
-
-        if (!access.CanManageMatch(editing.HomeTeamId, editing.AwayTeamId))
-        {
-            errorMessage = "No tenes permisos para agregar eventos en este partido.";
-            return;
-        }
-
-        var match = await Db.Matches
-            .AsNoTracking()
-            .Include(x => x.HomeTeam)
-            .Include(x => x.AwayTeam)
-            .FirstOrDefaultAsync(x => x.Id == editing.MatchId);
-
-        errorMessage = ValidateMatchEventOperation(match, eventForm);
-        if (errorMessage is not null)
-        {
-            return;
-        }
-
-        errorMessage = await ValidatePlayerAvailabilityForEventAsync(
-            editing.MatchId,
-            eventForm.PlayerId,
-            eventForm.EventType,
-            null);
-        if (errorMessage is not null)
-        {
-            return;
-        }
-
         isSavingEvent = true;
         try
         {
+            successMessage = null;
+            errorMessage = Validate(eventForm, editing, eventPlayers);
+            if (errorMessage is not null)
+            {
+                return;
+            }
+
+            if (!access.CanManageMatch(editing.HomeTeamId, editing.AwayTeamId))
+            {
+                errorMessage = "No tenes permisos para agregar eventos en este partido.";
+                return;
+            }
+
+            var match = await Db.Matches
+                .AsNoTracking()
+                .Include(x => x.HomeTeam)
+                .Include(x => x.AwayTeam)
+                .FirstOrDefaultAsync(x => x.Id == editing.MatchId);
+
+            errorMessage = ValidateMatchEventOperation(match, eventForm);
+            if (errorMessage is not null)
+            {
+                return;
+            }
+
+            errorMessage = await ValidatePlayerAvailabilityForEventAsync(
+                editing.MatchId,
+                eventForm.PlayerId,
+                eventForm.EventType,
+                null);
+            if (errorMessage is not null)
+            {
+                return;
+            }
+
+            errorMessage = await ValidateDuplicateEventAsync(
+                editing.MatchId,
+                eventForm.EventType,
+                eventForm.Minute,
+                eventForm.TeamId,
+                eventForm.PlayerId,
+                eventForm.PlayerName,
+                null);
+            if (errorMessage is not null)
+            {
+                return;
+            }
+
             if (!access.CanModerate)
             {
                 if (access.UserId is not { } userId)
@@ -864,6 +877,19 @@ else
             return;
         }
 
+        errorMessage = await ValidateDuplicateEventAsync(
+            editing.MatchId,
+            edit.EventType,
+            edit.Minute,
+            edit.TeamId,
+            edit.PlayerId,
+            edit.PlayerName,
+            eventId);
+        if (errorMessage is not null)
+        {
+            return;
+        }
+
         if (!access.CanManageMatch(editing.HomeTeamId, editing.AwayTeamId))
         {
             errorMessage = "No tenes permisos para editar eventos de este partido.";
@@ -965,6 +991,10 @@ else
             await NotifyMatchDataChangedAsync();
             successMessage = "Propuesta aprobada y aplicada correctamente.";
         }
+        catch (InvalidOperationException ex)
+        {
+            errorMessage = ex.Message;
+        }
         catch (Exception)
         {
             errorMessage = "No se pudo aprobar la propuesta. Revisa los datos e intenta nuevamente.";
@@ -1038,6 +1068,20 @@ else
 
             case ProposalChangeType.MatchEventAdd:
                 var addPayload = FromJson<MatchEventAddProposalPayload>(proposal.PayloadJson);
+                var duplicateEvent = await ValidateDuplicateEventAsync(
+                    proposal.MatchId,
+                    addPayload.EventType,
+                    addPayload.Minute,
+                    addPayload.TeamId,
+                    addPayload.PlayerId,
+                    addPayload.PlayerName,
+                    null,
+                    includePendingProposals: false);
+                if (duplicateEvent is not null)
+                {
+                    throw new InvalidOperationException(duplicateEvent);
+                }
+
                 Db.MatchEvents.Add(new MatchEvent(
                     proposal.MatchId,
                     addPayload.EventType,
@@ -1061,6 +1105,63 @@ else
             default:
                 throw new InvalidOperationException("Tipo de propuesta no soportado.");
         }
+    }
+
+    private async Task<string?> ValidateDuplicateEventAsync(
+        Guid matchId,
+        MatchEventType eventType,
+        int minute,
+        Guid teamId,
+        Guid? playerId,
+        string playerName,
+        Guid? excludedEventId,
+        bool includePendingProposals = true)
+    {
+        var normalizedPlayerName = NormalizePlayerName(playerName);
+        var existingEvents = await Db.MatchEvents
+            .AsNoTracking()
+            .Where(x =>
+                x.MatchId == matchId &&
+                x.Type == eventType &&
+                x.Minute == minute &&
+                x.TeamId == teamId &&
+                (excludedEventId == null || x.Id != excludedEventId.Value))
+            .Select(x => new
+            {
+                x.PlayerId,
+                x.PlayerName
+            })
+            .ToListAsync();
+
+        if (existingEvents.Any(x => SameEventPlayer(x.PlayerId, x.PlayerName, playerId, normalizedPlayerName)))
+        {
+            return "Ya existe un evento igual para ese jugador, equipo y minuto.";
+        }
+
+        if (!includePendingProposals)
+        {
+            return null;
+        }
+
+        var pendingPayloads = await Db.MatchUpdateProposals
+            .AsNoTracking()
+            .Where(x => x.MatchId == matchId && x.Status == ProposalStatus.Pending && x.ChangeType == ProposalChangeType.MatchEventAdd)
+            .Select(x => x.PayloadJson)
+            .ToListAsync();
+
+        foreach (var payloadJson in pendingPayloads)
+        {
+            var payload = FromJson<MatchEventAddProposalPayload>(payloadJson);
+            if (payload.EventType == eventType &&
+                payload.Minute == minute &&
+                payload.TeamId == teamId &&
+                SameEventPlayer(payload.PlayerId, payload.PlayerName, playerId, normalizedPlayerName))
+            {
+                return "Ya existe una propuesta pendiente con el mismo evento.";
+            }
+        }
+
+        return null;
     }
 
     private async Task<string?> ValidateMatchEditAsync(AdminMatchEditModel model)
@@ -1274,6 +1375,19 @@ else
                 group.Count(x => x.EventType == MatchEventType.YellowCard) >= 2)
             .Select(group => group.Key);
     }
+
+    private static bool SameEventPlayer(Guid? existingPlayerId, string existingPlayerName, Guid? candidatePlayerId, string normalizedCandidateName)
+    {
+        if (existingPlayerId is not null && candidatePlayerId is not null)
+        {
+            return existingPlayerId == candidatePlayerId;
+        }
+
+        return NormalizePlayerName(existingPlayerName) == normalizedCandidateName;
+    }
+
+    private static string NormalizePlayerName(string value) =>
+        string.Join(' ', value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)).ToUpperInvariant();
 
     private static string ScoreText(int? homeScore, int? awayScore) =>
         homeScore is null || awayScore is null ? "vs" : $"{homeScore}-{awayScore}";

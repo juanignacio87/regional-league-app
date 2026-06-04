@@ -53,13 +53,9 @@ else
                             <td><strong>@row.Position</strong></td>
                             <td>
                                 <a class="standings-club-link" href="clubs/@row.ClubId">
-                                    <ClubLogo Name="@row.ClubName" LogoPath="@row.ClubLogoPath" Class="club-logo-xs" />
+                                    <ClubLogo Name="@DisplayClubName(row)" LogoPath="@row.ClubLogoPath" Class="club-logo-xs" />
                                     <span>
-                                        @row.ClubName
-                                        @if (standings.Select(x => x.ClubId).Distinct().Count() != standings.Count)
-                                        {
-                                            <small>@row.CompetitionName</small>
-                                        }
+                                        @DisplayClubName(row)
                                     </span>
                                 </a>
                             </td>
@@ -81,6 +77,7 @@ else
 
 @code {
     private IReadOnlyList<StandingRowDto> standings = [];
+    private Dictionary<Guid, string> clubShortNames = [];
     private Func<Task>? reloadHandler;
     private string? leagueName;
     private string? competitionName;
@@ -157,5 +154,19 @@ else
         standings = CompetitionId is null
             ? loadedStandings
             : loadedStandings.Where(x => x.CompetitionId == CompetitionId).ToList();
+
+        var clubIds = standings.Select(x => x.ClubId).Distinct().ToList();
+        clubShortNames = clubIds.Count == 0
+            ? []
+            : await Db.Clubs
+                .AsNoTracking()
+                .Where(x => clubIds.Contains(x.Id))
+                .Select(x => new { x.Id, x.ShortName })
+                .ToDictionaryAsync(x => x.Id, x => x.ShortName);
     }
+
+    private string DisplayClubName(StandingRowDto row)
+        => clubShortNames.TryGetValue(row.ClubId, out var shortName) && !string.IsNullOrWhiteSpace(shortName)
+            ? shortName
+            : row.ClubName;
 }

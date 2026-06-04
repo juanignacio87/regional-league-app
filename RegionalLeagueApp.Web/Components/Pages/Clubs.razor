@@ -24,16 +24,25 @@
 
 @if (canManageClubs)
 {
-    <details class="panel clubs-admin-shell">
-        <summary>
-            <span>
-                <small class="eyebrow">Administracion</small>
-                <strong>Crear club</strong>
-            </span>
+    <section class="panel clubs-admin-shell">
+        <div class="clubs-admin-header">
+            <div>
+                <p class="eyebrow">Administracion</p>
+                <h2>Herramientas de clubes</h2>
+            </div>
             <span class="clubs-admin-shell__hint">Admin / Moderator</span>
-        </summary>
+        </div>
 
-        <div class="clubs-form">
+        <div class="clubs-admin-actions" aria-label="Acciones administrativas de clubes">
+            <button type="button" class='@ActiveAdminPanelClass("create")' @onclick='() => ToggleAdminPanel("create")'>Crear club</button>
+            <button type="button" class='@ActiveAdminPanelClass("manage")' @onclick='() => ToggleAdminPanel("manage")'>Gestionar clubes y equipos</button>
+        </div>
+
+        @if (activeAdminPanel == "create")
+        {
+        <section class="clubs-admin-block clubs-admin-block--first">
+            <h2>Crear club</h2>
+            <div class="clubs-form">
             <label>
                 Nombre
                 <input class="form-control" value="@newClubName" @oninput="eventArgs => newClubName = eventArgs.Value?.ToString() ?? string.Empty" maxlength="150" />
@@ -61,19 +70,13 @@
             <button type="button" class="leagues-button" disabled="@isSaving" @onclick="CreateClubAsync">
                 @(isSaving ? "Guardando..." : "Crear club")
             </button>
-        </div>
-    </details>
+            </div>
+        </section>
+        }
 
-    <details class="panel clubs-admin-shell">
-        <summary>
-            <span>
-                <small class="eyebrow">Administracion</small>
-                <strong>Editar clubes y equipos</strong>
-            </span>
-            <span class="clubs-admin-shell__hint">@teamRows.Count equipo(s)</span>
-        </summary>
-
-        <section class="clubs-admin-block">
+        @if (activeAdminPanel == "manage")
+        {
+        <section class="clubs-admin-block clubs-admin-block--first">
             <h2>Clubes</h2>
             <div class="clubs-edit-list">
                 @foreach (var club in clubs)
@@ -195,7 +198,8 @@
                 </div>
             }
         </section>
-    </details>
+        }
+    </section>
 }
 
 @if (clubs.Count == 0)
@@ -208,9 +212,12 @@ else
         @foreach (var club in clubs)
         {
             <a class="club-card" href="clubs/@club.Id">
-                <ClubLogo Name="@club.Name" LogoPath="@club.LogoPath" />
-                <strong>@club.Name</strong>
-                <small>@club.Venue?.Name - @club.Venue?.City</small>
+                <ClubLogo Name="@DisplayClubName(club)" LogoPath="@club.LogoPath" />
+                <strong>@DisplayClubName(club)</strong>
+                @if (!string.IsNullOrWhiteSpace(CityLabel(club)))
+                {
+                    <small>@CityLabel(club)</small>
+                }
                 @if (!club.IsActive)
                 {
                     <small class="leagues-pill">Archivado</small>
@@ -230,6 +237,7 @@ else
     private bool canManageClubs;
     private bool isSaving;
     private bool isSuccessMessage;
+    private string? activeAdminPanel;
     private string? statusMessage;
     private string? leagueName;
     private string? competitionName;
@@ -690,6 +698,17 @@ else
         statusMessage = message;
         isSuccessMessage = success;
     }
+
+    private static string DisplayClubName(Club club) => string.IsNullOrWhiteSpace(club.ShortName) ? club.Name : club.ShortName;
+
+    private static string CityLabel(Club club) => club.Venue?.City ?? string.Empty;
+
+    private void ToggleAdminPanel(string panel)
+    {
+        activeAdminPanel = activeAdminPanel == panel ? null : panel;
+    }
+
+    private string ActiveAdminPanelClass(string panel) => activeAdminPanel == panel ? "is-active" : string.Empty;
 
     private sealed record ClubOption(Guid Id, string Name);
     private sealed record CompetitionOption(Guid Id, string Label);

@@ -21,38 +21,9 @@
     </div>
 }
 
-@if (leagues.Count == 0)
-{
-    <EmptyState Text="No hay ligas cargadas." />
-}
-else
-{
-    <section class="leagues-grid">
-        @foreach (var league in PublicLeagues)
-        {
-            <a class="leagues-card @(league.IsActive ? string.Empty : "leagues-card--archived")" href="leagues/@league.Id">
-                <span class="leagues-card__mark">@Initials(league.Name)</span>
-                <div class="leagues-card__body">
-                    <h2>@league.Name</h2>
-                    <p>@LocationText(league.Region, league.Country)</p>
-                    @if (!league.IsActive)
-                    {
-                        <small class="leagues-pill">Archivada</small>
-                    }
-
-                    <div class="leagues-card__meta">
-                        <span><strong>@league.SeasonCount</strong> temporadas</span>
-                        <span><strong>@league.CompetitionCount</strong> competiciones</span>
-                    </div>
-                </div>
-            </a>
-        }
-    </section>
-}
-
 @if (canManageLeagues)
 {
-    <details class="panel leagues-admin-shell">
+    <details open class="panel leagues-admin-shell leagues-admin-shell--top">
         <summary>
             <span>
                 <small class="eyebrow">Administracion</small>
@@ -163,6 +134,35 @@ else
             </section>
         </div>
     </details>
+}
+
+@if (leagues.Count == 0)
+{
+    <EmptyState Text="No hay ligas cargadas." />
+}
+else
+{
+    <section class="leagues-grid">
+        @foreach (var league in PublicLeagues)
+        {
+            <a class="leagues-card @(league.IsActive ? string.Empty : "leagues-card--archived")" href="leagues/@league.Id">
+                <span class="leagues-card__mark">@Initials(league.Name)</span>
+                <div class="leagues-card__body">
+                    <h2>@league.Name</h2>
+                    <p>@LocationText(league.Region, league.Country)</p>
+                    @if (!league.IsActive)
+                    {
+                        <small class="leagues-pill">Archivada</small>
+                    }
+
+                    <div class="leagues-card__meta">
+                        <span><strong>@league.SeasonCount</strong> temporadas</span>
+                        <span><strong>@league.CompetitionCount</strong> competiciones</span>
+                    </div>
+                </div>
+            </a>
+        }
+    </section>
 }
 
 @code {

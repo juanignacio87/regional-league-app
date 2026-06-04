@@ -23,10 +23,10 @@
             <NavLink class="rl-navbar__link" href="standings">Tabla</NavLink>
             <NavLink class="rl-navbar__link" href="clubs">Clubes</NavLink>
             <details class="rl-navbar__more">
-                <summary class="rl-navbar__link">Mas</summary>
-                <div class="rl-navbar__more-menu">
-                    <NavLink class="rl-navbar__link" href="scorers">Goleadores</NavLink>
-                    <NavLink class="rl-navbar__link" href="discipline">Disciplina</NavLink>
+                <summary class="rl-navbar__link rl-navbar__more-trigger" aria-haspopup="menu">Mas</summary>
+                <div class="rl-navbar__more-menu" role="menu" aria-label="Mas secciones">
+                    <NavLink class="rl-navbar__link" href="scorers" role="menuitem">Goleadores</NavLink>
+                    <NavLink class="rl-navbar__link" href="discipline" role="menuitem">Disciplina</NavLink>
                 </div>
             </details>
         </nav>

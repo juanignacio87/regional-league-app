@@ -12,13 +12,14 @@ public sealed class EfDisciplineQueryService(ApplicationDbContext dbContext) : I
         var query = dbContext.MatchEvents
             .AsNoTracking()
             .Where(matchEvent =>
-                matchEvent.PlayerId != null &&
+                (matchEvent.PlayerId != null || matchEvent.PlayerName != string.Empty) &&
                 (matchEvent.Type == MatchEventType.YellowCard || matchEvent.Type == MatchEventType.RedCard) &&
                 matchEvent.Match!.Competition!.IsActive &&
                 matchEvent.Match.Competition.Season!.League!.IsActive &&
+                matchEvent.TeamId != null &&
                 matchEvent.Team!.IsActive &&
                 matchEvent.Team.Club!.IsActive &&
-                matchEvent.Player!.IsActive);
+                (matchEvent.Player == null || matchEvent.Player.IsActive));
 
         if (leagueId is not null)
         {
@@ -30,8 +31,12 @@ public sealed class EfDisciplineQueryService(ApplicationDbContext dbContext) : I
                 matchEvent.MatchId,
                 matchEvent.Match!.CompetitionId,
                 matchEvent.Match.Competition!.Name,
-                matchEvent.PlayerId!.Value,
-                matchEvent.PlayerName != string.Empty ? matchEvent.PlayerName : matchEvent.Player!.DisplayName,
+                matchEvent.PlayerId,
+                matchEvent.PlayerName != string.Empty
+                    ? matchEvent.PlayerName
+                    : matchEvent.Player != null
+                        ? matchEvent.Player.DisplayName
+                        : string.Empty,
                 matchEvent.TeamId!.Value,
                 matchEvent.Team!.Name,
                 matchEvent.Team.ClubId,
@@ -41,28 +46,36 @@ public sealed class EfDisciplineQueryService(ApplicationDbContext dbContext) : I
             .ToListAsync(cancellationToken);
 
         var rows = cardEvents
+            .Where(matchEvent => !string.IsNullOrWhiteSpace(matchEvent.PlayerName))
             .GroupBy(matchEvent => new
             {
                 matchEvent.CompetitionId,
                 matchEvent.CompetitionName,
-                matchEvent.PlayerId,
-                matchEvent.PlayerName,
                 matchEvent.TeamId,
                 matchEvent.TeamName,
                 matchEvent.ClubId,
-                matchEvent.ClubName
+                matchEvent.ClubName,
+                PlayerName = Normalize(matchEvent.PlayerName)
             })
-            .Select(group => new DisciplineRowDraft(
-                group.Key.CompetitionId,
-                group.Key.CompetitionName,
-                group.Key.PlayerId,
-                group.Key.PlayerName,
-                group.Key.TeamId,
-                group.Key.TeamName,
-                group.Key.ClubId,
-                group.Key.ClubName,
-                group.Count(matchEvent => matchEvent.Type == MatchEventType.YellowCard),
-                group.Count(matchEvent => matchEvent.Type == MatchEventType.RedCard) + DoubleYellowExpulsions(group)));
+            .Select(group =>
+            {
+                var canonical = group
+                    .OrderByDescending(matchEvent => matchEvent.PlayerId is not null)
+                    .ThenBy(matchEvent => matchEvent.PlayerName)
+                    .First();
+
+                return new DisciplineRowDraft(
+                    group.Key.CompetitionId,
+                    group.Key.CompetitionName,
+                    canonical.PlayerId,
+                    canonical.PlayerName.Trim(),
+                    group.Key.TeamId,
+                    group.Key.TeamName,
+                    group.Key.ClubId,
+                    group.Key.ClubName,
+                    group.Count(matchEvent => matchEvent.Type == MatchEventType.YellowCard),
+                    group.Count(matchEvent => matchEvent.Type == MatchEventType.RedCard) + DoubleYellowExpulsions(group));
+            });
 
         return rows
             .Select(row => new DisciplineRowDto(
@@ -119,11 +132,14 @@ public sealed class EfDisciplineQueryService(ApplicationDbContext dbContext) : I
             .Count(group => group.Count(matchEvent => matchEvent.Type == MatchEventType.YellowCard) >= 2);
     }
 
+    private static string Normalize(string value) =>
+        string.Join(' ', value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)).ToUpperInvariant();
+
     private sealed record CardEvent(
         Guid MatchId,
         Guid CompetitionId,
         string CompetitionName,
-        Guid PlayerId,
+        Guid? PlayerId,
         string PlayerName,
         Guid TeamId,
         string TeamName,
@@ -134,7 +150,7 @@ public sealed class EfDisciplineQueryService(ApplicationDbContext dbContext) : I
     private sealed record DisciplineRowDraft(
         Guid CompetitionId,
         string CompetitionName,
-        Guid PlayerId,
+        Guid? PlayerId,
         string PlayerName,
         Guid TeamId,
         string TeamName,

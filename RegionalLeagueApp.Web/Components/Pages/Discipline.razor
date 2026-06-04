@@ -44,10 +44,18 @@ else
                     @foreach (var row in group.OrderByDescending(x => x.Status).ThenByDescending(x => x.YellowCards).ThenByDescending(x => x.RedCards).ThenBy(x => x.PlayerName))
                     {
                         <tr class="@DisciplineRowClass(row.Status)">
-                            <td><a href="players/@row.PlayerId">@row.PlayerName</a></td>
                             <td>
-                                <a href="clubs/@row.ClubId">@row.ClubName</a>
-                                <small>@row.TeamName</small>
+                                @if (row.PlayerId is { } playerId)
+                                {
+                                    <a href="players/@playerId">@row.PlayerName</a>
+                                }
+                                else
+                                {
+                                    @row.PlayerName
+                                }
+                            </td>
+                            <td>
+                                <a href="clubs/@row.ClubId">@ClubTeamLabel(row)</a>
                             </td>
                             <td><strong>@row.YellowCards</strong></td>
                             <td><strong>@row.RedCards</strong></td>
@@ -116,4 +124,19 @@ else
         DisciplineStatus.Warned => "discipline-row--warned",
         _ => string.Empty
     };
+
+    private static string ClubTeamLabel(DisciplineRowDto row)
+    {
+        if (string.IsNullOrWhiteSpace(row.TeamName) || string.Equals(row.TeamName, row.ClubName, StringComparison.OrdinalIgnoreCase))
+        {
+            return row.ClubName;
+        }
+
+        if (row.TeamName.Contains(row.ClubName, StringComparison.OrdinalIgnoreCase))
+        {
+            return row.TeamName;
+        }
+
+        return $"{row.ClubName} / {row.TeamName}";
+    }
 }

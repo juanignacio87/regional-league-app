@@ -9,6 +9,7 @@ using RegionalLeagueApp.Application.Fixtures;
 using RegionalLeagueApp.Infrastructure.Collaboration;
 using RegionalLeagueApp.Application.Matches;
 using RegionalLeagueApp.Application.Players;
+using RegionalLeagueApp.Application.Scorers;
 using RegionalLeagueApp.Application.Standings;
 using RegionalLeagueApp.Infrastructure.Fixtures;
 using RegionalLeagueApp.Infrastructure.Discipline;
@@ -16,6 +17,7 @@ using RegionalLeagueApp.Infrastructure.Identity;
 using RegionalLeagueApp.Infrastructure.Matches;
 using RegionalLeagueApp.Infrastructure.Persistence;
 using RegionalLeagueApp.Infrastructure.Players;
+using RegionalLeagueApp.Infrastructure.Scorers;
 using RegionalLeagueApp.Infrastructure.Seed;
 using RegionalLeagueApp.Infrastructure.Standings;
 
@@ -61,6 +63,8 @@ public static class DependencyInjection
         services.AddScoped<IFixtureGeneratorService, FixtureGeneratorService>();
         services.AddScoped<IFixtureRulesService, EfFixtureRulesService>();
         services.AddScoped<IPlayerCsvImportService, EfPlayerCsvImportService>();
+        services.AddScoped<IManualPlayerValidationService, EfManualPlayerValidationService>();
+        services.AddScoped<IScorersQueryService, EfScorersQueryService>();
         services.AddScoped<IDisciplineQueryService, EfDisciplineQueryService>();
         services.AddScoped<IStandingsQueryService, EfStandingsQueryService>();
         services.AddScoped<IStandingsRecalculationService, EfStandingsRecalculationService>();

@@ -37,6 +37,24 @@ a {
     box-shadow: 0 0 0 .1rem white, 0 0 0 .25rem #9fd8ca;
 }
 
+a:focus:not(:focus-visible),
+button:focus:not(:focus-visible),
+summary:focus:not(:focus-visible) {
+    box-shadow: none;
+    outline: none;
+}
+
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+    box-shadow: 0 0 0 3px rgba(159, 216, 202, .85);
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+}
+
 h1:focus {
     outline: none;
 }
@@ -865,12 +883,24 @@ p {
 
 .fixture-filter-links a {
     background: #e6f3ef;
+    border: 1px solid #cde7df;
     border-radius: 999px;
     color: #0f4f43;
+    display: inline-flex;
     font-size: .82rem;
     font-weight: 900;
-    padding: .3rem .55rem;
+    line-height: 1.1;
+    min-height: 30px;
+    padding: .42rem .68rem;
     text-decoration: none;
+    transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+
+.fixture-filter-links a:hover,
+.fixture-filter-links a.is-active {
+    background: #103d35;
+    border-color: #103d35;
+    color: #fff;
 }
 
 .match-card {
@@ -1119,7 +1149,11 @@ p {
 }
 
 .leagues-admin-shell {
-    margin-top: 1rem;
+    margin: 1rem 0;
+}
+
+.leagues-admin-shell--top {
+    margin-top: 0;
 }
 
 .leagues-admin-shell summary {
@@ -1384,6 +1418,12 @@ p {
     grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 }
 
+.leagues-participants--compact {
+    gap: .45rem;
+    grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+    margin-top: .65rem;
+}
+
 .leagues-participant {
     align-items: center;
     color: inherit;
@@ -1392,6 +1432,27 @@ p {
     grid-template-columns: auto minmax(0, 1fr);
     padding: .75rem;
     text-decoration: none;
+}
+
+.leagues-participant--compact {
+    gap: .5rem;
+    padding: .5rem;
+}
+
+.leagues-participant--compact strong {
+    display: block;
+    line-height: 1.1;
+}
+
+.leagues-participant--compact span {
+    background: #e6f3ef;
+    border-radius: 999px;
+    color: #0f4f43;
+    display: inline-flex;
+    font-size: .72rem;
+    font-weight: 900;
+    margin-top: .18rem;
+    padding: .16rem .45rem;
 }
 
 .league-ops {
@@ -2034,21 +2095,19 @@ p {
     margin-bottom: 1rem;
 }
 
-.clubs-admin-shell summary {
+.clubs-admin-header {
     align-items: center;
-    cursor: pointer;
     display: grid;
     gap: 1rem;
     grid-template-columns: minmax(0, 1fr) auto;
-    list-style: none;
 }
 
-.clubs-admin-shell summary::-webkit-details-marker {
-    display: none;
+.clubs-admin-header h2,
+.clubs-admin-header p {
+    margin: 0;
 }
 
-.clubs-admin-shell summary strong {
-    display: block;
+.clubs-admin-header h2 {
     font-size: 1.05rem;
 }
 
@@ -2059,6 +2118,30 @@ p {
     font-size: .82rem;
     font-weight: 900;
     padding: .35rem .65rem;
+}
+
+.clubs-admin-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .45rem;
+    margin-top: .85rem;
+}
+
+.clubs-admin-actions button {
+    background: #e6f3ef;
+    border: 0;
+    border-radius: 999px;
+    color: #0f4f43;
+    cursor: pointer;
+    font-size: .84rem;
+    font-weight: 900;
+    padding: .38rem .65rem;
+    text-decoration: none;
+}
+
+.clubs-admin-actions button.is-active {
+    background: #103d35;
+    color: #fff;
 }
 
 .clubs-form {
@@ -2081,6 +2164,10 @@ p {
     gap: .85rem;
     margin-top: 1rem;
     padding-top: 1rem;
+}
+
+.clubs-admin-block--first {
+    margin-top: .85rem;
 }
 
 .clubs-admin-block h2 {
@@ -3386,7 +3473,7 @@ p {
         justify-content: stretch;
     }
 
-    .clubs-admin-shell summary {
+    .clubs-admin-header {
         grid-template-columns: 1fr;
     }
 
@@ -3673,6 +3760,18 @@ p {
     color: #0f4f43;
 }
 
+.rl-navbar__link:focus {
+    outline: none;
+}
+
+.rl-navbar__link:focus-visible,
+.rl-navbar__account-button:focus-visible,
+.rl-navbar__toggle-button:focus-visible {
+    box-shadow: 0 0 0 3px rgba(159, 216, 202, .85);
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+}
+
 .rl-navbar__more {
     flex: 0 0 auto;
     position: relative;
@@ -3684,6 +3783,16 @@ p {
     list-style: none;
 }
 
+.rl-navbar__more-trigger::after {
+    content: "";
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid currentColor;
+    display: inline-block;
+    margin-left: .35rem;
+    vertical-align: .12em;
+}
+
 .rl-navbar__more summary::-webkit-details-marker {
     display: none;
 }
@@ -3693,19 +3802,22 @@ p {
     border: 1px solid #dfe8e5;
     border-radius: 8px;
     box-shadow: 0 12px 32px rgba(16, 35, 31, .12);
-    display: grid;
+    display: none;
     gap: .2rem;
     min-width: 150px;
+    max-width: min(220px, calc(100vw - 2rem));
     padding: .35rem;
     position: absolute;
     right: 0;
     top: calc(100% + .4rem);
-    z-index: 100;
+    z-index: 200;
     animation: rl-navbar-menu-in .12s ease-out;
 }
 
-.rl-navbar__more:not([open]) .rl-navbar__more-menu {
-    display: none;
+.rl-navbar__more[open] .rl-navbar__more-menu,
+.rl-navbar__more:hover .rl-navbar__more-menu,
+.rl-navbar__more:focus-within .rl-navbar__more-menu {
+    display: grid;
 }
 
 .rl-navbar__more-menu .rl-navbar__link {
@@ -3846,16 +3958,18 @@ p {
     }
 
     .rl-navbar__more {
-        width: 100%;
+        width: auto;
     }
 
     .rl-navbar__more-menu {
-        border: 0;
-        box-shadow: none;
-        display: flex;
-        flex-wrap: wrap;
-        padding: .35rem 0 0;
-        position: static;
+        border: 1px solid #dfe8e5;
+        box-shadow: 0 12px 32px rgba(16, 35, 31, .12);
+        max-width: min(220px, calc(100vw - 2rem));
+        padding: .35rem;
+        position: absolute;
+        right: auto;
+        left: 0;
+        top: calc(100% + .4rem);
     }
 
     .rl-navbar__toggle-input:checked ~ .rl-navbar__links {

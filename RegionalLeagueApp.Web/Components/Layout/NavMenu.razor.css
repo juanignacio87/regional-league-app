@@ -85,6 +85,18 @@
     white-space: nowrap;
 }
 
+.rl-navbar__links ::deep .rl-navbar__link:focus {
+    outline: none;
+}
+
+.rl-navbar__links ::deep .rl-navbar__link:focus-visible,
+.rl-navbar__account-button:focus-visible,
+.rl-navbar__toggle-button:focus-visible {
+    box-shadow: 0 0 0 3px rgba(159, 216, 202, .85);
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+}
+
 .rl-navbar__links ::deep .rl-navbar__link:hover,
 .rl-navbar__links ::deep .rl-navbar__link.active {
     background: #e6f3ef;
@@ -102,6 +114,16 @@
     list-style: none;
 }
 
+.rl-navbar__more-trigger::after {
+    content: "";
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid currentColor;
+    display: inline-block;
+    margin-left: .35rem;
+    vertical-align: .12em;
+}
+
 .rl-navbar__more summary::-webkit-details-marker {
     display: none;
 }
@@ -111,19 +133,22 @@
     border: 1px solid #dfe8e5;
     border-radius: 8px;
     box-shadow: 0 12px 32px rgba(16, 35, 31, .12);
-    display: grid;
+    display: none;
     gap: .2rem;
     min-width: 150px;
+    max-width: min(220px, calc(100vw - 2rem));
     padding: .35rem;
     position: absolute;
     right: 0;
     top: calc(100% + .4rem);
-    z-index: 100;
+    z-index: 200;
     animation: rl-navbar-menu-in .12s ease-out;
 }
 
-.rl-navbar__more:not([open]) .rl-navbar__more-menu {
-    display: none;
+.rl-navbar__more[open] .rl-navbar__more-menu,
+.rl-navbar__more:hover .rl-navbar__more-menu,
+.rl-navbar__more:focus-within .rl-navbar__more-menu {
+    display: grid;
 }
 
 .rl-navbar__more-menu ::deep .rl-navbar__link {
@@ -264,16 +289,18 @@
     }
 
     .rl-navbar__more {
-        width: 100%;
+        width: auto;
     }
 
     .rl-navbar__more-menu {
-        border: 0;
-        box-shadow: none;
-        display: flex;
-        flex-wrap: wrap;
-        padding: .35rem 0 0;
-        position: static;
+        border: 1px solid #dfe8e5;
+        box-shadow: 0 12px 32px rgba(16, 35, 31, .12);
+        max-width: min(220px, calc(100vw - 2rem));
+        padding: .35rem;
+        position: absolute;
+        right: auto;
+        left: 0;
+        top: calc(100% + .4rem);
     }
 
     .rl-navbar__toggle-input:checked ~ .rl-navbar__links {
