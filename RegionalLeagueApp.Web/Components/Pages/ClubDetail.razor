@@ -1,16 +1,10 @@
 @page "/clubs/{Id:guid}"
 @rendermode InteractiveServer
-@using System.IO
-@using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.EntityFrameworkCore
-@using RegionalLeagueApp.Application.Players
 @inject ApplicationDbContext Db
 @inject AuthenticationStateProvider AuthenticationStateProvider
-@inject IPlayerCsvImportService PlayerCsvImportService
-@inject IManualPlayerValidationService ManualPlayerValidationService
-@inject IWebHostEnvironment Environment
 
-<PageTitle>Club</PageTitle>
+<PageTitle>@(club?.Name ?? "Club")</PageTitle>
 
 @if (club is null)
 {
@@ -20,14 +14,48 @@ else
 {
     <PageBreadcrumb BackHref="/clubs" ParentHref="/clubs" ParentLabel="Clubes" CurrentLabel="@club.Name" />
 
-    <section class="club-header" style="border-color:@(club.PrimaryColor ?? "#14532d")">
+    <section class="club-profile-hero" style="border-color:@HeroAccentColor">
         <ClubLogo Name="@club.Name" LogoPath="@club.LogoPath" Class="club-logo-lg" />
-        <div>
-            <p class="eyebrow">@club.ShortName</p>
-            <h1>@club.Name</h1>
-            <p>@club.Venue?.Name, @club.Venue?.City</p>
+        <div class="club-profile-hero__main">
+            <p class="eyebrow">Perfil de club</p>
+            <h1>@PublicClubName</h1>
+            @if (!string.Equals(PublicClubName, club.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                <p class="club-official-name">@club.Name</p>
+            }
+            <div class="club-profile-facts">
+                <div>
+                    <span>Ciudad</span>
+                    <strong>@CityLabel</strong>
+                </div>
+                <div>
+                    <span>Sede</span>
+                    <strong>@VenueLabel</strong>
+                </div>
+                <div>
+                    <span>Fundacion</span>
+                    <strong>@FoundedLabel</strong>
+                </div>
+            </div>
         </div>
-        <strong>@(club.FoundedYear?.ToString() ?? "S/D")</strong>
+        <div class="club-profile-actions">
+            @if (ClubHexColor is not null)
+            {
+                <span class="club-color-chip club-color-chip--swatch-only" title="Color del club">
+                    <span style="background:@ClubHexColor"></span>
+                </span>
+            }
+            @if (GoogleMapsUrl is not null)
+            {
+                <a class="leagues-button leagues-button--muted" href="@GoogleMapsUrl" target="_blank" rel="noopener noreferrer">Ver ubicacion</a>
+            }
+            @if (canManage)
+            {
+                <button type="button" class="leagues-button leagues-button--muted" @onclick="ToggleEditClub">
+                    @(showEditClub ? "Cerrar edicion" : "Editar club")
+                </button>
+            }
+        </div>
     </section>
 
     @if (!string.IsNullOrWhiteSpace(statusMessage))
@@ -37,227 +65,195 @@ else
         </div>
     }
 
-    @if (canManage)
+    @if (canManage && showEditClub)
     {
-        <section class="panel club-admin-panel">
-            <div class="club-admin-panel__header">
+        <section class="panel club-edit-panel">
+            <div class="panel-title-row">
                 <div>
                     <p class="eyebrow">Admin / Moderator</p>
-                    <h2>Escudo del club</h2>
-                    <span>PNG, JPG, WebP o GIF. Maximo 1 MB.</span>
+                    <h2>Editar club</h2>
                 </div>
-                <ClubLogo Name="@club.Name" LogoPath="@club.LogoPath" Class="club-logo-admin__preview" />
+                <span>Perfil individual</span>
             </div>
 
-            <div class="club-logo-admin__form">
-                <InputFile id="club-logo-file" OnChange="OnClubLogoSelected" accept="image/png,image/jpeg,image/webp,image/gif" />
-                <span>@(selectedLogoFileName ?? "Selecciona una imagen para actualizar el escudo.")</span>
-                <button type="button" class="leagues-button" disabled="@(isSavingLogo || selectedLogoFile is null)" @onclick="SaveClubLogoAsync">
-                    @(isSavingLogo ? "Guardando..." : "Actualizar escudo")
+            <div class="clubs-form">
+                <label>
+                    Nombre
+                    <input class="form-control" value="@editClub.Name" @oninput="eventArgs => editClub.Name = eventArgs.Value?.ToString() ?? string.Empty" maxlength="150" />
+                </label>
+                <label>
+                    Nombre corto
+                    <input class="form-control" value="@editClub.ShortName" @oninput="eventArgs => editClub.ShortName = eventArgs.Value?.ToString() ?? string.Empty" maxlength="30" />
+                </label>
+                <label>
+                    Ciudad
+                    <input class="form-control" value="@editClub.VenueCity" @oninput="eventArgs => editClub.VenueCity = eventArgs.Value?.ToString() ?? string.Empty" maxlength="120" />
+                </label>
+                <label>
+                    Sede
+                    <input class="form-control" value="@editClub.VenueName" @oninput="eventArgs => editClub.VenueName = eventArgs.Value?.ToString() ?? string.Empty" maxlength="150" />
+                </label>
+                <label>
+                    Anio fundacion
+                    <input class="form-control" value="@editClub.FoundedYear" @oninput="eventArgs => editClub.FoundedYear = eventArgs.Value?.ToString() ?? string.Empty" inputmode="numeric" placeholder="1922" maxlength="4" />
+                </label>
+                <label>
+                    Color principal
+                    <input class="form-control" value="@editClub.PrimaryColor" @oninput="eventArgs => editClub.PrimaryColor = eventArgs.Value?.ToString() ?? string.Empty" placeholder="#166534" maxlength="20" />
+                </label>
+                <label class="checkbox-line club-edit-checkbox">
+                    <input type="checkbox" checked="@editClub.IsActive" @onchange="eventArgs => editClub.IsActive = eventArgs.Value is true" />
+                    Activo
+                </label>
+                <button type="button" class="leagues-button" disabled="@isSaving" @onclick="SaveClubAsync">
+                    @(isSaving ? "Guardando..." : "Guardar club")
                 </button>
             </div>
         </section>
-
-        <details class="panel roster-admin-shell">
-            <summary>
-                <span>
-                    <small class="eyebrow">Admin / Moderator</small>
-                    <strong>Administrar plantel</strong>
-                </span>
-                <span class="clubs-admin-shell__hint">@AllTeams.Count equipo(s)</span>
-            </summary>
-
-            <section class="roster-admin-team">
-                <div class="roster-admin-team__header">
-                    <div>
-                        <h2>Importar plantel CSV</h2>
-                        <span>Formato: Team,DisplayName,FirstName,LastName,ShirtNumber,Position,BirthDate</span>
-                    </div>
-                </div>
-
-                <textarea class="form-control admin-csv-import__input" value="@playerCsvInput" @oninput="e => playerCsvInput = e.Value?.ToString() ?? string.Empty" placeholder="Team,DisplayName,FirstName,LastName,ShirtNumber,Position,BirthDate&#10;Olimpia Primera,Juan Perez,Juan,Perez,9,Forward,1998-04-10"></textarea>
-                <div class="admin-csv-import__actions">
-                    <button type="button" class="leagues-button leagues-button--muted" disabled="@isSaving" @onclick="PreviewPlayerCsvAsync">Previsualizar</button>
-                    @if (playerCsvPreview is not null && playerCsvPreview.ValidCount > 0)
-                    {
-                        <button type="button" class="leagues-button" disabled="@isSaving" @onclick="ConfirmPlayerCsvImportAsync">Confirmar importacion (@playerCsvPreview.ValidCount)</button>
-                    }
-                </div>
-
-                @if (playerCsvPreview is not null)
-                {
-                    <div class="table-panel admin-csv-preview">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Fila</th>
-                                    <th>Team</th>
-                                    <th>Display name</th>
-                                    <th>Dorsal</th>
-                                    <th>Posicion</th>
-                                    <th>Estado</th>
-                                    <th>Mensaje</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var row in playerCsvPreview.Rows)
-                                {
-                                    <tr class="admin-csv-preview--@row.Status.ToString().ToLowerInvariant()">
-                                        <td>@row.RowNumber</td>
-                                        <td>@row.Team</td>
-                                        <td>@row.DisplayName</td>
-                                        <td>@row.ShirtNumber</td>
-                                        <td>@row.Position</td>
-                                        <td>@row.Status</td>
-                                        <td>@row.Message</td>
-                                    </tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                }
-            </section>
-
-            @foreach (var team in AllTeams)
-            {
-                var create = GetCreateModel(team.Id);
-                <section class="roster-admin-team">
-                    <div class="roster-admin-team__header">
-                        <div>
-                            <h2>@team.Name</h2>
-                            <span>@team.Category</span>
-                        </div>
-                        <span class="leagues-status @(team.IsActive ? "leagues-status--active" : "leagues-status--archived")">@(team.IsActive ? "Activo" : "Inactivo")</span>
-                    </div>
-
-                    <div class="roster-form">
-                        <label>Display name <input class="form-control" value="@create.DisplayName" @oninput="e => create.DisplayName = e.Value?.ToString() ?? string.Empty" maxlength="160" /></label>
-                        <label>Nombre <input class="form-control" value="@create.FirstName" @oninput="e => create.FirstName = e.Value?.ToString() ?? string.Empty" maxlength="100" /></label>
-                        <label>Apellido <input class="form-control" value="@create.LastName" @oninput="e => create.LastName = e.Value?.ToString() ?? string.Empty" maxlength="100" /></label>
-                        <label>Dorsal <input class="form-control" type="number" min="1" value="@create.ShirtNumber" @oninput="e => create.ShirtNumber = e.Value?.ToString() ?? string.Empty" placeholder="10" /></label>
-                        <label>
-                            Posicion
-                            <select class="form-control" @bind="create.Position">
-                                <option value="">Sin especificar</option>
-                                @foreach (var position in Enum.GetValues<PlayerPosition>().Where(x => x != PlayerPosition.Unknown))
-                                {
-                                    <option value="@position">@position</option>
-                                }
-                            </select>
-                        </label>
-                        <label>Nacimiento <input class="form-control" type="date" value="@create.BirthDate" @oninput="e => create.BirthDate = e.Value?.ToString() ?? string.Empty" /></label>
-                        <label class="checkbox-line"><input type="checkbox" checked="@create.IsActive" @onchange="e => create.IsActive = e.Value is true" /> Activo</label>
-                        <button type="button" class="leagues-button" disabled="@isSaving" @onclick="() => CreatePlayerAsync(team.Id)">Crear jugador</button>
-                    </div>
-
-                    @if (!team.Players.Any())
-                    {
-                        <EmptyState Text="Todavia no hay jugadores cargados para este equipo." />
-                    }
-                    else
-                    {
-                        <div class="roster-admin-list">
-                            @foreach (var player in team.Players.OrderByDescending(x => x.IsActive).ThenBy(x => x.ShirtNumber ?? 999).ThenBy(x => x.DisplayName))
-                            {
-                                var edit = GetEditModel(player);
-                                <article class="roster-admin-row @(player.IsActive ? string.Empty : "is-archived")">
-                                    <div class="roster-edit-grid">
-                                        <label>Display <input class="form-control" value="@edit.DisplayName" @oninput="e => edit.DisplayName = e.Value?.ToString() ?? string.Empty" maxlength="160" /></label>
-                                        <label>Nombre <input class="form-control" value="@edit.FirstName" @oninput="e => edit.FirstName = e.Value?.ToString() ?? string.Empty" maxlength="100" /></label>
-                                        <label>Apellido <input class="form-control" value="@edit.LastName" @oninput="e => edit.LastName = e.Value?.ToString() ?? string.Empty" maxlength="100" /></label>
-                                        <label>Dorsal <input class="form-control" type="number" min="1" value="@edit.ShirtNumber" @oninput="e => edit.ShirtNumber = e.Value?.ToString() ?? string.Empty" /></label>
-                                        <label>
-                                            Posicion
-                                            <select class="form-control" @bind="edit.Position">
-                                                <option value="">Sin especificar</option>
-                                                @foreach (var position in Enum.GetValues<PlayerPosition>().Where(x => x != PlayerPosition.Unknown))
-                                                {
-                                                    <option value="@position">@position</option>
-                                                }
-                                            </select>
-                                        </label>
-                                        <label>Nacimiento <input class="form-control" type="date" value="@edit.BirthDate" @oninput="e => edit.BirthDate = e.Value?.ToString() ?? string.Empty" /></label>
-                                        <label class="checkbox-line"><input type="checkbox" checked="@edit.IsActive" @onchange="e => edit.IsActive = e.Value is true" /> Activo</label>
-                                    </div>
-                                    <div class="roster-actions">
-                                        <button type="button" class="admin-link-button" disabled="@isSaving" @onclick="() => UpdatePlayerAsync(player.Id)">Guardar</button>
-                                        <button type="button" class="admin-link-button admin-link-button-muted" disabled="@isSaving" @onclick="() => SetPlayerActiveAsync(player.Id, !player.IsActive)">@(player.IsActive ? "Archivar" : "Reactivar")</button>
-                                        <a class="admin-link-button admin-link-button-muted" href="/players/@player.Id">Perfil</a>
-                                    </div>
-                                </article>
-                            }
-                        </div>
-                    }
-                </section>
-            }
-        </details>
     }
 
-    @foreach (var team in DisplayTeams)
-    {
-        <section class="panel section-gap">
-            <h2>@team.Name</h2>
-            @if (!team.Players.Any(x => x.IsActive))
+    <section class="club-profile-grid">
+        <article class="panel club-profile-section">
+            <div class="panel-title-row">
+                <div>
+                    <p class="eyebrow">Equipos</p>
+                    <h2>Equipos del club</h2>
+                </div>
+                <span>@ActiveTeams.Count equipo(s)</span>
+            </div>
+
+            @if (ActiveTeams.Count == 0)
             {
-                <EmptyState Text="Plantel pendiente de carga." />
+                <EmptyState Text="Todavia no hay equipos activos asociados a este club." />
             }
             else
             {
-                <div class="player-grid">
-                    @foreach (var player in team.Players.Where(x => x.IsActive).OrderBy(x => x.ShirtNumber ?? 999).ThenBy(x => x.LastName))
+                <div class="club-team-list">
+                    @foreach (var team in ActiveTeams)
                     {
-                        <a class="player-row" href="/players/@player.Id">
-                            <strong>@(player.ShirtNumber?.ToString() ?? "-")</strong>
-                            <span>@player.FullName</span>
-                            <small>@PositionText(player.Position)</small>
-                        </a>
+                        <div class="club-team-row">
+                            <strong>@TeamDisplayName(team)</strong>
+                            <div class="club-team-meta">
+                                <span>@TeamLeagueLabel(team)</span>
+                                <span>@TeamCompetitionLabel(team)</span>
+                            </div>
+                        </div>
                     }
                 </div>
             }
-        </section>
-    }
+        </article>
+
+        <article class="panel club-profile-section">
+            <div class="panel-title-row">
+                <div>
+                    <p class="eyebrow">Estadisticas</p>
+                    <h2>Estadisticas basicas</h2>
+                </div>
+            </div>
+
+            <div class="club-stat-grid">
+                <div class="club-stat-card">
+                    <strong>@ActiveTeams.Count</strong>
+                    <span>Equipos activos</span>
+                </div>
+                <div class="club-stat-card">
+                    <strong>@ActivePlayers.Count</strong>
+                    <span>Jugadores activos</span>
+                </div>
+                <div class="club-stat-card">
+                    <strong>@CompetitionCount</strong>
+                    <span>Competencias</span>
+                </div>
+                <div class="club-stat-card">
+                    <strong>@(club.FoundedYear?.ToString() ?? "S/D")</strong>
+                    <span>Fundacion</span>
+                </div>
+            </div>
+        </article>
+    </section>
+
+    <section class="panel club-profile-section section-gap">
+        <div class="panel-title-row">
+            <div>
+                <p class="eyebrow">Plantel</p>
+                <h2>Jugadores del club</h2>
+            </div>
+            <span>@ActivePlayers.Count jugador(es)</span>
+        </div>
+
+        @if (ActivePlayers.Count == 0)
+        {
+            <EmptyState Text="Plantel pendiente de carga." />
+        }
+        else
+        {
+            @foreach (var team in ActiveTeams.Where(team => team.Players.Any(player => player.IsActive)))
+            {
+                <div class="club-player-section">
+                    <h3>@TeamDisplayName(team)</h3>
+                    <div class="player-grid">
+                        @foreach (var player in team.Players.Where(x => x.IsActive).OrderBy(x => x.ShirtNumber ?? 999).ThenBy(x => x.DisplayName))
+                        {
+                            <a class="player-row" href="/players/@player.Id">
+                                <strong>@(player.ShirtNumber?.ToString() ?? "-")</strong>
+                                <span>@player.FullName</span>
+                                <small>@PositionText(player.Position)</small>
+                            </a>
+                        }
+                    </div>
+                </div>
+            }
+        }
+    </section>
 }
 
 @code {
     [Parameter] public Guid Id { get; set; }
 
-    private readonly Dictionary<Guid, PlayerEditModel> createModels = [];
-    private readonly Dictionary<Guid, PlayerEditModel> editModels = [];
     private Club? club;
     private bool canManage;
     private bool isSaving;
-    private bool isSavingLogo;
     private bool isSuccessMessage;
+    private bool showEditClub;
     private string? statusMessage;
-    private string playerCsvInput = string.Empty;
-    private IBrowserFile? selectedLogoFile;
-    private string? selectedLogoFileName;
-    private PlayerCsvPreviewResult? playerCsvPreview;
-    private static readonly HashSet<string> AllowedLogoExtensions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ".png",
-        ".jpg",
-        ".jpeg",
-        ".webp",
-        ".gif"
-    };
+    private ClubEditModel editClub = new();
 
-    private const long MaxLogoBytes = 1 * 1024 * 1024;
+    private string PublicClubName => string.IsNullOrWhiteSpace(club?.ShortName) ? club?.Name ?? "Club" : club.ShortName;
 
-    private List<Team> AllTeams => club is null
-        ? []
-        : club.Teams
-            .OrderByDescending(x => x.IsActive)
-            .ThenBy(x => x.Name)
-            .ToList();
+    private string? ClubHexColor => IsHexColor(club?.PrimaryColor) ? club!.PrimaryColor!.Trim() : null;
 
-    private IEnumerable<Team> DisplayTeams => club is null
+    private string HeroAccentColor => ClubHexColor ?? "#14532d";
+
+    private string CityLabel => string.IsNullOrWhiteSpace(club?.Venue?.City) ? "Ciudad sin cargar" : club.Venue.City;
+
+    private string VenueLabel => string.IsNullOrWhiteSpace(club?.Venue?.Name) ? "Sede sin cargar" : club.Venue.Name;
+
+    private string FoundedLabel => club?.FoundedYear?.ToString() ?? "S/D";
+
+    private string? GoogleMapsUrl => club?.Venue is null ||
+        string.IsNullOrWhiteSpace(club.Venue.Name) ||
+        string.IsNullOrWhiteSpace(club.Venue.City)
+            ? null
+            : $"https://www.google.com/maps/search/?api=1&query={Uri.EscapeDataString($"{club.Venue.Name} {club.Venue.City}")}";
+
+    private List<Team> ActiveTeams => club is null
         ? []
         : club.Teams
             .Where(x => x.IsActive)
-            .GroupBy(x => x.Name)
-            .Select(x => x.First())
-            .OrderBy(x => x.Name);
+            .OrderBy(x => x.Competition?.Season?.League?.Name)
+            .ThenBy(x => x.Competition?.Name)
+            .ThenBy(x => x.Name)
+            .ToList();
+
+    private List<Player> ActivePlayers => ActiveTeams
+        .SelectMany(team => team.Players)
+        .Where(player => player.IsActive)
+        .ToList();
+
+    private int CompetitionCount => ActiveTeams
+        .Select(team => team.CompetitionId)
+        .Distinct()
+        .Count();
 
     protected override async Task OnParametersSetAsync()
     {
@@ -273,311 +269,178 @@ else
             .Include(x => x.Venue)
             .Include(x => x.Teams)
                 .ThenInclude(x => x.Players)
+            .Include(x => x.Teams)
+                .ThenInclude(x => x.Competition)!.ThenInclude(x => x!.Season)!.ThenInclude(x => x!.League)
             .FirstOrDefaultAsync(x => x.Id == Id && (x.IsActive || canManage));
 
-        PrepareModels();
+        PrepareEditModel();
     }
 
-    private void PrepareModels()
+    private void ToggleEditClub()
     {
-        editModels.Clear();
-        foreach (var player in club?.Teams.SelectMany(x => x.Players) ?? [])
+        showEditClub = !showEditClub;
+        if (showEditClub)
         {
-            editModels[player.Id] = PlayerEditModel.FromPlayer(player);
-        }
-
-        foreach (var team in club?.Teams ?? [])
-        {
-            createModels.TryAdd(team.Id, new PlayerEditModel { IsActive = true });
+            PrepareEditModel();
         }
     }
 
-    private void OnClubLogoSelected(InputFileChangeEventArgs args)
+    private void PrepareEditModel()
     {
-        selectedLogoFile = args.File;
-        selectedLogoFileName = selectedLogoFile.Name;
+        if (club is null)
+        {
+            editClub = new ClubEditModel();
+            return;
+        }
+
+        editClub = new ClubEditModel
+        {
+            Name = club.Name,
+            ShortName = club.ShortName,
+            VenueCity = club.Venue?.City ?? string.Empty,
+            VenueName = club.Venue?.Name ?? string.Empty,
+            FoundedYear = club.FoundedYear?.ToString() ?? string.Empty,
+            PrimaryColor = club.PrimaryColor ?? string.Empty,
+            IsActive = club.IsActive
+        };
     }
 
-    private async Task SaveClubLogoAsync()
+    private async Task SaveClubAsync()
     {
-        if (!canManage)
+        if (!canManage || club is null || isSaving)
         {
-            SetMessage("No tenes permisos para cargar logos.", false);
             return;
         }
 
-        if (selectedLogoFile is null)
+        var name = editClub.Name.Trim();
+        var shortName = editClub.ShortName.Trim();
+        var venueCity = editClub.VenueCity.Trim();
+        var venueName = editClub.VenueName.Trim();
+        var primaryColor = string.IsNullOrWhiteSpace(editClub.PrimaryColor) ? null : editClub.PrimaryColor.Trim();
+
+        if (!ValidateClubInput(name, shortName, venueName, venueCity, editClub.FoundedYear, out var foundedYear, out var error))
         {
-            SetMessage("Selecciona una imagen para actualizar el escudo.", false);
+            SetMessage(error, false);
             return;
         }
 
-        var file = selectedLogoFile;
-        var extension = Path.GetExtension(file.Name);
-        if (!file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase) || !AllowedLogoExtensions.Contains(extension))
+        if (await Db.Clubs.AnyAsync(x => x.Id != Id && (x.Name == name || x.ShortName == shortName)))
         {
-            SetMessage("El archivo debe ser una imagen valida.", false);
+            SetMessage("Ya existe otro club con ese nombre o nombre corto.", false);
             return;
         }
 
-        if (file.Size > MaxLogoBytes)
-        {
-            SetMessage("La imagen no puede superar 1 MB.", false);
-            return;
-        }
-
-        isSavingLogo = true;
+        isSaving = true;
         try
         {
             var selectedClub = await Db.Clubs.FirstOrDefaultAsync(x => x.Id == Id);
             if (selectedClub is null)
             {
-                SetMessage("No se encontro el club seleccionado.", false);
+                SetMessage("Club no encontrado.", false);
                 return;
             }
 
-            var uploadsPath = Path.Combine(Environment.WebRootPath, "uploads", "clubs");
-            Directory.CreateDirectory(uploadsPath);
+            var venueId = await ResolveVenueIdAsync(venueName, venueCity);
+            selectedClub.UpdateDetails(name, shortName, primaryColor, foundedYear, venueId);
+            selectedClub.SetActive(editClub.IsActive);
+            await Db.SaveChangesAsync();
+            SetMessage("Club actualizado correctamente.", true);
+            await LoadAsync();
+        }
+        catch (DbUpdateException)
+        {
+            SetMessage("No se pudo actualizar el club.", false);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
 
-            var fileName = $"{selectedClub.Id:N}-{Guid.NewGuid():N}{extension.ToLowerInvariant()}";
-            var physicalPath = Path.Combine(uploadsPath, fileName);
+    private async Task<Guid?> ResolveVenueIdAsync(string venueName, string venueCity)
+    {
+        if (string.IsNullOrWhiteSpace(venueName) && string.IsNullOrWhiteSpace(venueCity))
+        {
+            return null;
+        }
 
-            await using (var stream = File.Create(physicalPath))
+        var venue = await Db.Venues.FirstOrDefaultAsync(x => x.Name == venueName && x.City == venueCity);
+        if (venue is null)
+        {
+            venue = new Venue(venueName, venueCity);
+            Db.Venues.Add(venue);
+        }
+
+        return venue.Id;
+    }
+
+    private static bool ValidateClubInput(string name, string shortName, string venueName, string venueCity, string foundedYearText, out int? foundedYear, out string error)
+    {
+        foundedYear = null;
+        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(shortName))
+        {
+            error = "Nombre y nombre corto son obligatorios.";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(venueName) != string.IsNullOrWhiteSpace(venueCity))
+        {
+            error = "Para cargar la sede, completa sede y ciudad.";
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(foundedYearText))
+        {
+            if (!int.TryParse(foundedYearText.Trim(), out var parsedYear) || parsedYear < 1800 || parsedYear > DateTime.UtcNow.Year)
             {
-                await file.OpenReadStream(MaxLogoBytes).CopyToAsync(stream);
+                error = "Ingresa solo el anio de fundacion, por ejemplo 1922.";
+                return false;
             }
 
-            selectedClub.SetLogoPath($"/uploads/clubs/{fileName}");
-            await Db.SaveChangesAsync();
-            selectedLogoFile = null;
-            selectedLogoFileName = null;
-            SetMessage("Escudo actualizado correctamente.", true);
-            await LoadAsync();
+            foundedYear = parsedYear;
         }
-        finally
-        {
-            isSavingLogo = false;
-        }
+
+        error = string.Empty;
+        return true;
     }
 
-    private PlayerEditModel GetCreateModel(Guid teamId)
+    private static string TeamDisplayName(Team team)
     {
-        if (!createModels.TryGetValue(teamId, out var model))
+        if (string.IsNullOrWhiteSpace(team.Category) || team.Name.Contains(team.Category, StringComparison.OrdinalIgnoreCase))
         {
-            model = new PlayerEditModel { IsActive = true };
-            createModels[teamId] = model;
+            return team.Name;
         }
 
-        return model;
+        return $"{team.Name} - {team.Category}";
     }
 
-    private PlayerEditModel GetEditModel(Player player)
+    private static string TeamLeagueLabel(Team team) =>
+        team.Competition?.Season?.League?.Name ?? "Liga sin cargar";
+
+    private static string TeamCompetitionLabel(Team team)
     {
-        if (!editModels.TryGetValue(player.Id, out var model))
-        {
-            model = PlayerEditModel.FromPlayer(player);
-            editModels[player.Id] = model;
-        }
-
-        return model;
+        var competition = team.Competition?.Name;
+        return string.IsNullOrWhiteSpace(competition) ? "Competencia sin cargar" : competition;
     }
-
-    private async Task CreatePlayerAsync(Guid teamId)
-    {
-        var model = GetCreateModel(teamId);
-        var validation = await ValidatePlayerAsync(teamId, model, null);
-        if (validation is not null)
-        {
-            SetMessage(validation, false);
-            return;
-        }
-
-        var player = new Player(teamId, model.FirstName.Trim(), model.LastName.Trim(), ParsePosition(model.Position), ParseShirtNumber(model.ShirtNumber), ParseBirthDate(model.BirthDate));
-        isSaving = true;
-        try
-        {
-            Db.Players.Add(player);
-            await Db.SaveChangesAsync();
-            Db.Entry(player).Property(x => x.DisplayName).CurrentValue = model.DisplayName.Trim();
-            Db.Entry(player).Property(x => x.IsActive).CurrentValue = model.IsActive;
-            Db.Entry(player).Property(x => x.ArchivedAt).CurrentValue = model.IsActive ? null : DateTime.UtcNow;
-            await Db.SaveChangesAsync();
-            createModels[teamId] = new PlayerEditModel { IsActive = true };
-            SetMessage("Jugador creado correctamente.", true);
-            await LoadAsync();
-        }
-        catch (DbUpdateException)
-        {
-            SetMessage("No se pudo crear el jugador. Revisa que el dorsal no este duplicado.", false);
-        }
-        finally
-        {
-            isSaving = false;
-        }
-    }
-
-    private async Task UpdatePlayerAsync(Guid playerId)
-    {
-        if (!editModels.TryGetValue(playerId, out var model))
-        {
-            SetMessage("Jugador no encontrado.", false);
-            return;
-        }
-
-        var existing = await Db.Players.AsNoTracking().FirstOrDefaultAsync(x => x.Id == playerId);
-        if (existing is null)
-        {
-            SetMessage("Jugador no encontrado.", false);
-            return;
-        }
-
-        var validation = await ValidatePlayerAsync(existing.TeamId, model, playerId);
-        if (validation is not null)
-        {
-            SetMessage(validation, false);
-            return;
-        }
-
-        var player = await Db.Players.FirstOrDefaultAsync(x => x.Id == playerId);
-        if (player is null)
-        {
-            SetMessage("Jugador no encontrado.", false);
-            return;
-        }
-
-        isSaving = true;
-        try
-        {
-            Db.Entry(player).Property(x => x.DisplayName).CurrentValue = model.DisplayName.Trim();
-            Db.Entry(player).Property(x => x.FirstName).CurrentValue = model.FirstName.Trim();
-            Db.Entry(player).Property(x => x.LastName).CurrentValue = model.LastName.Trim();
-            Db.Entry(player).Property(x => x.ShirtNumber).CurrentValue = ParseShirtNumber(model.ShirtNumber);
-            Db.Entry(player).Property(x => x.Position).CurrentValue = ParsePosition(model.Position);
-            Db.Entry(player).Property(x => x.BirthDate).CurrentValue = ParseBirthDate(model.BirthDate);
-            Db.Entry(player).Property(x => x.IsActive).CurrentValue = model.IsActive;
-            Db.Entry(player).Property(x => x.ArchivedAt).CurrentValue = model.IsActive ? null : DateTime.UtcNow;
-            await Db.SaveChangesAsync();
-            SetMessage("Jugador actualizado correctamente.", true);
-            await LoadAsync();
-        }
-        catch (DbUpdateException)
-        {
-            SetMessage("No se pudo actualizar el jugador. Revisa que el dorsal no este duplicado.", false);
-        }
-        finally
-        {
-            isSaving = false;
-        }
-    }
-
-    private async Task SetPlayerActiveAsync(Guid playerId, bool isActive)
-    {
-        var player = await Db.Players.FirstOrDefaultAsync(x => x.Id == playerId);
-        if (player is null)
-        {
-            SetMessage("Jugador no encontrado.", false);
-            return;
-        }
-
-        if (isActive)
-        {
-            var validation = await ManualPlayerValidationService.ValidateAsync(new ManualPlayerValidationRequest(
-                player.TeamId,
-                player.DisplayName,
-                player.ShirtNumber,
-                true,
-                player.BirthDate,
-                player.Id));
-            if (validation is not null)
-            {
-                SetMessage($"No se puede reactivar: {validation}", false);
-                return;
-            }
-        }
-
-        player.SetActive(isActive);
-        await Db.SaveChangesAsync();
-        SetMessage(isActive ? "Jugador reactivado." : "Jugador archivado.", true);
-        await LoadAsync();
-    }
-
-    private async Task PreviewPlayerCsvAsync()
-    {
-        if (string.IsNullOrWhiteSpace(playerCsvInput))
-        {
-            SetMessage("Pega el contenido CSV para previsualizar.", false);
-            return;
-        }
-
-        playerCsvPreview = await PlayerCsvImportService.PreviewAsync(Id, playerCsvInput);
-        SetMessage($"Preview generado: {playerCsvPreview.ValidCount} fila(s) valida(s) de {playerCsvPreview.Rows.Count}.", playerCsvPreview.ValidCount > 0);
-    }
-
-    private async Task ConfirmPlayerCsvImportAsync()
-    {
-        if (playerCsvPreview is null)
-        {
-            SetMessage("Genera una previsualizacion antes de importar.", false);
-            return;
-        }
-
-        var validRows = playerCsvPreview.Rows
-            .Where(x => x.Status == PlayerCsvRowStatus.Valid)
-            .Select(x => x.RowNumber)
-            .ToList();
-        if (validRows.Count == 0)
-        {
-            SetMessage("No hay filas validas para importar.", false);
-            return;
-        }
-
-        var failedRows = playerCsvPreview.Rows.Count - validRows.Count;
-        isSaving = true;
-        try
-        {
-            var result = await PlayerCsvImportService.ImportAsync(Id, validRows, playerCsvInput);
-            playerCsvPreview = null;
-            await LoadAsync();
-            var failedMessage = failedRows > 0 ? $" {failedRows} fila(s) fallaron y no se guardaron." : string.Empty;
-            SetMessage($"Se importaron {result.ImportedCount} jugador(es).{failedMessage} Genera una nueva previsualizacion para volver a importar.", true);
-        }
-        catch (DbUpdateException)
-        {
-            playerCsvPreview = null;
-            await LoadAsync();
-            SetMessage("No se pudo completar la importacion. No se guardaron jugadores parciales.", false);
-        }
-        finally
-        {
-            isSaving = false;
-        }
-    }
-
-    private async Task<string?> ValidatePlayerAsync(Guid teamId, PlayerEditModel model, Guid? currentPlayerId)
-    {
-        var shirtNumber = ParseShirtNumber(model.ShirtNumber);
-        var birthDate = ParseBirthDate(model.BirthDate);
-
-        return await ManualPlayerValidationService.ValidateAsync(new ManualPlayerValidationRequest(
-            teamId,
-            model.DisplayName,
-            shirtNumber,
-            model.IsActive,
-            birthDate,
-            currentPlayerId));
-    }
-
-    private static int? ParseShirtNumber(string value) =>
-        int.TryParse(value, out var parsed) ? parsed : null;
-
-    private static DateOnly? ParseBirthDate(string value) =>
-        DateOnly.TryParse(value, out var parsed) ? parsed : null;
-
-    private static PlayerPosition ParsePosition(string value) =>
-        Enum.TryParse<PlayerPosition>(value, out var parsed) ? parsed : PlayerPosition.Unknown;
 
     private static string PositionText(PlayerPosition position) =>
         position == PlayerPosition.Unknown ? "Sin posicion" : position.ToString();
+
+    private static bool IsHexColor(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var trimmed = value.Trim();
+        if (trimmed.Length is not (4 or 7) || trimmed[0] != '#')
+        {
+            return false;
+        }
+
+        return trimmed.Skip(1).All(Uri.IsHexDigit);
+    }
 
     private void SetMessage(string message, bool success)
     {
@@ -585,25 +448,14 @@ else
         isSuccessMessage = success;
     }
 
-    private sealed class PlayerEditModel
+    private sealed class ClubEditModel
     {
-        public string DisplayName { get; set; } = string.Empty;
-        public string FirstName { get; set; } = string.Empty;
-        public string LastName { get; set; } = string.Empty;
-        public string ShirtNumber { get; set; } = string.Empty;
-        public string Position { get; set; } = string.Empty;
-        public string BirthDate { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string ShortName { get; set; } = string.Empty;
+        public string VenueCity { get; set; } = string.Empty;
+        public string VenueName { get; set; } = string.Empty;
+        public string FoundedYear { get; set; } = string.Empty;
+        public string PrimaryColor { get; set; } = string.Empty;
         public bool IsActive { get; set; } = true;
-
-        public static PlayerEditModel FromPlayer(Player player) => new()
-        {
-            DisplayName = player.DisplayName,
-            FirstName = player.FirstName,
-            LastName = player.LastName,
-            ShirtNumber = player.ShirtNumber?.ToString() ?? string.Empty,
-            Position = player.Position == PlayerPosition.Unknown ? string.Empty : player.Position.ToString(),
-            BirthDate = player.BirthDate?.ToString("yyyy-MM-dd") ?? string.Empty,
-            IsActive = player.IsActive
-        };
     }
 }
